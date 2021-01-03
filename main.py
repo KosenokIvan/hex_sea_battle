@@ -1,16 +1,15 @@
 import os
 import sys
 import pygame
+import settings as st
 
 pygame.init()
-WIDTH = 600
-HEIGHT = 600
-FPS = 60
-SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
+screen = pygame.display.set_mode((st.WIDTH, st.HEIGHT))
 pygame.display.set_caption("Hex test")
 
 player_cursor_group = pygame.sprite.Group()
 tiles_group = pygame.sprite.Group()
+ships_group = pygame.sprite.Group()
 
 
 def load_image(name, color_key=None):
@@ -38,18 +37,26 @@ class Game:
 
     def main_loop(self):
         while self.running:
-            SCREEN.fill((0, 0, 0))
+            screen.fill((0, 0, 0))
             player_cursor_arguments = []
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.MOUSEMOTION:
                     player_cursor_arguments.append(event)
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    player_cursor_arguments.append(event)
             player_cursor_group.update(*player_cursor_arguments)
             tiles_group.update()
-            tiles_group.draw(SCREEN)
+            tiles_group.draw(screen)
+            screen.blit(pygame.transform.rotate(PatrolBoat.patrol_boat_image, 90), (29, 27))
+            screen.blit(pygame.transform.rotate(Destroyer.destroyer_image, 90), (57, 25))
+            screen.blit(pygame.transform.rotate(Submarine.submarine_image, 90), (113, 24))
+            screen.blit(pygame.transform.rotate(Cruiser.cruiser_image, 90), (170, 23))
+            screen.blit(pygame.transform.rotate(BattleShip.battleship_image, 90), (15, 48))
+            screen.blit(pygame.transform.rotate(Carrier.carrier_image, 90), (127, 38))
             pygame.display.update()
-            self.clock.tick(FPS)
+            self.clock.tick(st.FPS)
         pygame.quit()
 
 
@@ -59,12 +66,17 @@ class PlayerCursor(pygame.sprite.Sprite):
         self.rect = pygame.Rect(0, 0, 1, 1)
 
     def update(self, *args, **kwargs):
+        active_tiles = pygame.sprite.spritecollide(self, tiles_group, False)
+        active_tile = (max(active_tiles, key=lambda x: x.get_coords()[1])
+                       if active_tiles else None)
+        if active_tile is not None:
+            active_tile.set_is_active(True)
         for event in args:
             if event.type == pygame.MOUSEMOTION:
                 self.rect.x, self.rect.y = event.pos
-        active_tiles = pygame.sprite.spritecollide(self, tiles_group, False)
-        if active_tiles:
-            max(active_tiles, key=lambda x: x.rect.y).set_is_active(True)
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if active_tile is not None:
+                    active_tile.set_is_fired_upon(True)
 
 
 class HexTile(pygame.sprite.Sprite):
@@ -74,6 +86,7 @@ class HexTile(pygame.sprite.Sprite):
     def __init__(self, pos):
         super().__init__(tiles_group)
         self.is_active = False
+        self.is_fired_upon = False
         self.image = self.shallow_image
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = pos
@@ -82,12 +95,18 @@ class HexTile(pygame.sprite.Sprite):
     def set_is_active(self, value):
         self.is_active = value
 
+    def set_is_fired_upon(self, value):
+        self.is_fired_upon = value
+
     def update(self, *args, **kwargs):
-        if self.is_active:
+        if self.is_active or self.is_fired_upon:
             self.image = self.deep_image
         else:
             self.image = self.shallow_image
         self.is_active = False
+
+    def get_coords(self):
+        return self.rect.x, self.rect.y
 
 
 class HexField:
@@ -100,7 +119,7 @@ class HexField:
 
     def create_field(self):
         for y in range(self.height):
-            for x in range(self.width + (0 if y % 2 == 0 else 1)):
+            for x in range(self.width):
                 if y % 2 == 0:
                     HexTile((x * 28 + self.x + 14, y * 24 + self.y))
                 else:
@@ -109,37 +128,65 @@ class HexField:
 
 class Ship(pygame.sprite.Sprite):
     """Abstract class"""
-    pass
+    def __init__(self, image):
+        super().__init__(ships_group)
+        self.image = image
+        self.rect = self.image.get_rect()
+
+    def get_coords(self):
+        return self.rect.x, self.rect.y
+
+    def set_coords(self, coords):
+        self.rect.x, self.rect.y = coords
 
 
 class PatrolBoat(Ship):
     """1 celled ship"""
-    pass
+    patrol_boat_image = pygame.transform.scale(load_image("ships/patrolboat.png"), (7, 28))
+
+    def __init__(self):
+        super().__init__(self.patrol_boat_image)
 
 
 class Destroyer(Ship):
     """2 celled ship"""
-    pass
+    destroyer_image = pygame.transform.scale(load_image("ships/destroyer.png"), (12, 56))
+
+    def __init__(self):
+        super().__init__(self.destroyer_image)
 
 
 class Submarine(Ship):
     """2 celled ship"""
-    pass
+    submarine_image = pygame.transform.scale(load_image("ships/submarine.png"), (14, 56))
+
+    def __init__(self):
+        super().__init__(self.submarine_image)
 
 
 class Cruiser(Ship):
     """3 celled ship"""
-    pass
+    cruiser_image = pygame.transform.scale(load_image("ships/cruiser.png"), (15, 84))
+
+    def __init__(self):
+        super().__init__(self.cruiser_image)
 
 
 class BattleShip(Ship):
     """4 celled ship"""
-    pass
+    battleship_image = pygame.transform.scale(load_image("ships/battleship.png"),
+                                              (15, 112))
+
+    def __init__(self):
+        super().__init__(self.battleship_image)
 
 
 class Carrier(Ship):
-    """4 or 5(?) celled ship"""
-    pass
+    """4 celled ship"""
+    carrier_image = pygame.transform.scale(load_image("ships/carrier.png"), (36, 112))
+
+    def __init__(self):
+        super().__init__(self.carrier_image)
 
 
 if __name__ == '__main__':
