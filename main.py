@@ -38,15 +38,16 @@ class Game:
         while self.running:
             screen.fill((0, 0, 0))
             player_cursor_arguments = []
+            field_arguments = []
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.MOUSEMOTION:
                     player_cursor_arguments.append(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    player_cursor_arguments.append(event)
-            player_cursor_group.update(*player_cursor_arguments, field=self.field)
-            self.field.update()
+                    field_arguments.append(event)
+            player_cursor_group.update(*player_cursor_arguments)
+            self.field.update(*field_arguments)
             self.field.draw(screen)
             screen.blit(pygame.transform.rotate(PatrolBoat.patrol_boat_image, 90), (29, 27))
             screen.blit(pygame.transform.rotate(Destroyer.destroyer_image, 90), (57, 25))
@@ -68,19 +69,9 @@ class PlayerCursor(pygame.sprite.Sprite):
         self.mask = pygame.mask.from_surface(self.image)
 
     def update(self, *args, **kwargs):
-        active_tiles = pygame.sprite.spritecollide(self, kwargs["field"], False,
-                                                   (lambda sprite1, sprite2:
-                                                    pygame.sprite.collide_mask(sprite1, sprite2)))
-        active_tile = (max(active_tiles, key=lambda x: x.get_coords()[1])
-                       if active_tiles else None)
-        if active_tile is not None:
-            active_tile.set_is_active(True)
         for event in args:
             if event.type == pygame.MOUSEMOTION:
                 self.rect.x, self.rect.y = event.pos
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if active_tile is not None:
-                    active_tile.set_is_fired_upon(True)
 
 
 class HexTile(pygame.sprite.Sprite):
@@ -103,11 +94,18 @@ class HexTile(pygame.sprite.Sprite):
         self.is_fired_upon = value
 
     def update(self, *args, **kwargs):
+        self.is_active = pygame.sprite.spritecollideany(self,
+                                                        player_cursor_group,
+                                                        (lambda s1, s2:
+                                                         pygame.sprite.collide_mask(s1, s2)))
+        for event in args:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.is_active:
+                    self.is_fired_upon = True
         if self.is_active or self.is_fired_upon:
             self.image = self.deep_image
         else:
             self.image = self.shallow_image
-        self.is_active = False
 
     def get_coords(self):
         return self.rect.x, self.rect.y
