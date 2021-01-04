@@ -6,7 +6,7 @@ import settings as st
 
 pygame.init()
 screen = pygame.display.set_mode((st.WIDTH, st.HEIGHT))
-pygame.display.set_caption("Hex test")
+pygame.display.set_caption("Шестиугольный морской бой")
 
 player_cursor_group = pygame.sprite.GroupSingle()
 tiles_group = pygame.sprite.Group()
@@ -34,15 +34,22 @@ class Game:
         self.clock = pygame.time.Clock()
         self.field = HexField(10, 10, 10, 10)
         self.fleet = Fleet()
+        self.ROTATE = 5
         self.patrol_boat = PatrolBoat(self.fleet)
-        self.patrol_boat.set_rotation(1)
+        self.patrol_boat.set_rotation(self.ROTATE)
         self.patrol_boat.bind_to_tile(self.field.sprites()[39])
         self.submarine = Submarine(self.fleet)
-        self.submarine.set_rotation(1)
+        self.submarine.set_rotation(self.ROTATE)
         self.submarine.bind_to_tile(self.field.sprites()[66])
+        self.battleship = BattleShip(self.fleet)
+        self.battleship.set_rotation(self.ROTATE)
+        self.battleship.bind_to_tile(self.field.sprites()[41])
+        self.cruiser = Cruiser(self.fleet)
+        self.cruiser.set_rotation(self.ROTATE)
+        self.cruiser.bind_to_tile(self.field.sprites()[35])
         self.carrier = Carrier(self.fleet)
-        self.carrier.set_rotation(1)
-        self.carrier.bind_to_tile(self.field.sprites()[41])
+        self.carrier.set_rotation(self.ROTATE)
+        self.carrier.bind_to_tile(self.field.sprites()[73])
         self.player_cursor = PlayerCursor()
 
     def main_loop(self):
@@ -146,7 +153,7 @@ class Ship(pygame.sprite.Sprite):
     def __init__(self, fleet, image, length):
         super().__init__(fleet)
         self.length = length
-        self.original_image = pygame.transform.rotate(image, 90)
+        self.original_image = image
         self.image = self.original_image
         self.rect = self.image.get_rect()
         self.rotation = 0
@@ -165,24 +172,44 @@ class Ship(pygame.sprite.Sprite):
         self.rotation = value % 6
         self.image = pygame.transform.rotate(self.original_image, 60 * self.rotation)
         self.rect = self.image.get_rect()
+        if self.head_tile is not None:
+            self.bind_to_tile(self.head_tile)
 
     def set_coords(self, pos):
         self.rect.x, self.rect.y = pos
 
     def bind_to_tile(self, tile):
+        self.head_tile = tile
         tile_x, tile_y = tile.get_coords()
         if self.rotation == 0:
             self.rect.x = tile_x + 5
             self.rect.y = tile_y + (HexTile.shallow_image.get_height() - self.rect.height) // 2
         elif self.rotation == 1:
-            self.rect.x = tile_x + (28 - self.original_image.get_height()) // 2 * sin(radians(60))
-            self.rect.y = int(tile_y - (48.5 * (self.length - 1)) * cos(radians(60)) +
-                              (28 - self.original_image.get_height()) // 2 * sin(radians(60)))
+            self.rect.x = int(tile_x + (29 - self.original_image.get_height())
+                              // 2 * sin(radians(60)))
+            self.rect.y = int(tile_y - (49 * (self.length - 1)) * cos(radians(60)) +
+                              (30 - self.original_image.get_height()) // 2 * cos(radians(60)))
+        elif self.rotation == 2:
+            self.rect.x = int(tile_x - 28 * (self.length - 1) * cos(radians(60)) +
+                              (30 - self.original_image.get_height()) // 2 * sin(radians(60)) + 1)
+            self.rect.y = int(tile_y - (49 * (self.length - 1)) * cos(radians(60))
+                              + (28 - self.original_image.get_height()) // 2 * sin(radians(60)) + 1)
+        elif self.rotation == 3:
+            self.rect.x = tile_x - 28 * (self.length - 1) + 7
+            self.rect.y = tile_y + (HexTile.shallow_image.get_height() - self.rect.height) // 2
+        elif self.rotation == 4:
+            self.rect.x = int(tile_x - 28 * (self.length - 1) * cos(radians(60)) +
+                              (30 - self.original_image.get_height()) // 2 * sin(radians(60)))
+            self.rect.y = tile_y + (25 - self.original_image.get_height()) // 2 * sin(radians(60))
+        elif self.rotation == 5:
+            self.rect.x = int(tile_x + (30 - self.original_image.get_height())
+                              // 2 * sin(radians(60)))
+            self.rect.y = tile_y + (26 - self.original_image.get_height()) // 2 * sin(radians(60))
 
 
 class PatrolBoat(Ship):
     """1 celled ship"""
-    patrol_boat_image = pygame.transform.scale(load_image("ships/patrolboat.png"), (7, 28))
+    patrol_boat_image = pygame.transform.scale(load_image("ships/patrolboat.png"), (28, 7))
 
     def __init__(self, fleet):
         super().__init__(fleet, self.patrol_boat_image, 1)
@@ -190,7 +217,7 @@ class PatrolBoat(Ship):
 
 class Destroyer(Ship):
     """2 celled ship"""
-    destroyer_image = pygame.transform.scale(load_image("ships/destroyer.png"), (12, 56))
+    destroyer_image = pygame.transform.scale(load_image("ships/destroyer.png"), (56, 12))
 
     def __init__(self, fleet):
         super().__init__(fleet, self.destroyer_image, 2)
@@ -198,7 +225,7 @@ class Destroyer(Ship):
 
 class Submarine(Ship):
     """2 celled ship"""
-    submarine_image = pygame.transform.scale(load_image("ships/submarine.png"), (14, 56))
+    submarine_image = pygame.transform.scale(load_image("ships/submarine.png"), (56, 14))
 
     def __init__(self, fleet):
         super().__init__(fleet, self.submarine_image, 2)
@@ -206,7 +233,7 @@ class Submarine(Ship):
 
 class Cruiser(Ship):
     """3 celled ship"""
-    cruiser_image = pygame.transform.scale(load_image("ships/cruiser.png"), (15, 84))
+    cruiser_image = pygame.transform.scale(load_image("ships/cruiser.png"), (84, 15))
 
     def __init__(self, fleet):
         super().__init__(fleet, self.cruiser_image, 3)
@@ -215,7 +242,7 @@ class Cruiser(Ship):
 class BattleShip(Ship):
     """4 celled ship"""
     battleship_image = pygame.transform.scale(load_image("ships/battleship.png"),
-                                              (15, 112))
+                                              (112, 15))
 
     def __init__(self, fleet):
         super().__init__(fleet, self.battleship_image, 4)
@@ -223,7 +250,7 @@ class BattleShip(Ship):
 
 class Carrier(Ship):
     """4 celled ship"""
-    carrier_image = pygame.transform.scale(load_image("ships/carrier.png"), (36, 112))
+    carrier_image = pygame.transform.scale(load_image("ships/carrier.png"), (112, 36))
 
     def __init__(self, fleet):
         super().__init__(fleet, self.carrier_image, 4)
