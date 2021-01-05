@@ -28,27 +28,34 @@ def load_image(name, color_key=None):
     return image
 
 
+def rotate(image, pos, angle):
+    width, height = image.get_size()
+    image2 = pygame.Surface((width * 2, height * 2), pygame.SRCALPHA)
+    image2.blit(image, (width - pos[0], height - pos[1]))
+    return pygame.transform.rotate(image2, angle)
+
+
 class Game:
     def __init__(self):
         self.running = True
         self.clock = pygame.time.Clock()
         self.field = HexField(10, 10, 10, 10)
         self.fleet = Fleet()
-        self.ROTATE = 5
+        self.rotate = 0
         self.patrol_boat = PatrolBoat(self.fleet)
-        self.patrol_boat.set_rotation(self.ROTATE)
+        self.patrol_boat.set_rotation(self.rotate)
         self.patrol_boat.bind_to_tile(self.field.sprites()[39])
         self.submarine = Submarine(self.fleet)
-        self.submarine.set_rotation(self.ROTATE)
+        self.submarine.set_rotation(self.rotate)
         self.submarine.bind_to_tile(self.field.sprites()[66])
         self.battleship = BattleShip(self.fleet)
-        self.battleship.set_rotation(self.ROTATE)
+        self.battleship.set_rotation(self.rotate)
         self.battleship.bind_to_tile(self.field.sprites()[41])
         self.cruiser = Cruiser(self.fleet)
-        self.cruiser.set_rotation(self.ROTATE)
+        self.cruiser.set_rotation(self.rotate)
         self.cruiser.bind_to_tile(self.field.sprites()[35])
         self.carrier = Carrier(self.fleet)
-        self.carrier.set_rotation(self.ROTATE)
+        self.carrier.set_rotation(self.rotate)
         self.carrier.bind_to_tile(self.field.sprites()[73])
         self.player_cursor = PlayerCursor()
 
@@ -64,6 +71,13 @@ class Game:
                     player_cursor_arguments.append(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     field_arguments.append(event)
+                    self.rotate += 1
+                    self.rotate %= 6
+                    self.patrol_boat.set_rotation(self.rotate)
+                    self.submarine.set_rotation(self.rotate)
+                    self.cruiser.set_rotation(self.rotate)
+                    self.battleship.set_rotation(self.rotate)
+                    self.carrier.set_rotation(self.rotate)
             player_cursor_group.update(*player_cursor_arguments)
             self.field.update(*field_arguments)
             self.fleet.update()
@@ -157,7 +171,7 @@ class Ship(pygame.sprite.Sprite):
         self.image = self.original_image
         self.rect = self.image.get_rect()
         self.rotation = 0
-        self.head_tile = None
+        self.head_point = (0, 0)
 
     def get_coords(self):
         return self.rect.x, self.rect.y
@@ -170,41 +184,24 @@ class Ship(pygame.sprite.Sprite):
 
     def set_rotation(self, value):
         self.rotation = value % 6
-        self.image = pygame.transform.rotate(self.original_image, 60 * self.rotation)
-        self.rect = self.image.get_rect()
-        if self.head_tile is not None:
-            self.bind_to_tile(self.head_tile)
+        self.bind_to_point(self.head_point)
 
     def set_coords(self, pos):
         self.rect.x, self.rect.y = pos
 
+    def bind_to_point(self, pos):
+        self.image = self.original_image
+        self.rect.x = pos[0] - HexTile.shallow_image.get_width() - self.image.get_width()
+        self.rect.y = pos[1] - self.image.get_height() * 1.5
+        self.image = rotate(self.original_image,
+                            (14, self.original_image.get_height() // 2), 60 * self.rotation)
+        self.rect = self.image.get_rect(center=pos)
+        self.head_point = pos
+
     def bind_to_tile(self, tile):
-        self.head_tile = tile
-        tile_x, tile_y = tile.get_coords()
-        if self.rotation == 0:
-            self.rect.x = tile_x + 5
-            self.rect.y = tile_y + (HexTile.shallow_image.get_height() - self.rect.height) // 2
-        elif self.rotation == 1:
-            self.rect.x = int(tile_x + (29 - self.original_image.get_height())
-                              // 2 * sin(radians(60)))
-            self.rect.y = int(tile_y - (49 * (self.length - 1)) * cos(radians(60)) +
-                              (30 - self.original_image.get_height()) // 2 * cos(radians(60)))
-        elif self.rotation == 2:
-            self.rect.x = int(tile_x - 28 * (self.length - 1) * cos(radians(60)) +
-                              (30 - self.original_image.get_height()) // 2 * sin(radians(60)) + 1)
-            self.rect.y = int(tile_y - (49 * (self.length - 1)) * cos(radians(60))
-                              + (28 - self.original_image.get_height()) // 2 * sin(radians(60)) + 1)
-        elif self.rotation == 3:
-            self.rect.x = tile_x - 28 * (self.length - 1) + 7
-            self.rect.y = tile_y + (HexTile.shallow_image.get_height() - self.rect.height) // 2
-        elif self.rotation == 4:
-            self.rect.x = int(tile_x - 28 * (self.length - 1) * cos(radians(60)) +
-                              (30 - self.original_image.get_height()) // 2 * sin(radians(60)))
-            self.rect.y = tile_y + (25 - self.original_image.get_height()) // 2 * sin(radians(60))
-        elif self.rotation == 5:
-            self.rect.x = int(tile_x + (30 - self.original_image.get_height())
-                              // 2 * sin(radians(60)))
-            self.rect.y = tile_y + (26 - self.original_image.get_height()) // 2 * sin(radians(60))
+        x, y = tile.get_coords()
+        self.bind_to_point((x + HexTile.shallow_image.get_width() // 2,
+                            y + HexTile.shallow_image.get_height() // 2))
 
 
 class PatrolBoat(Ship):
