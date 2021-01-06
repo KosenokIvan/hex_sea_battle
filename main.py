@@ -1,6 +1,5 @@
 import os
 import sys
-from math import sin, cos, radians
 import pygame
 import settings as st
 
@@ -44,19 +43,19 @@ class Game:
         self.rotate = 0
         self.patrol_boat = PatrolBoat(self.fleet)
         self.patrol_boat.set_rotation(self.rotate)
-        self.patrol_boat.bind_to_tile(self.field.sprites()[39])
+        self.patrol_boat.bind_to_point((400, 20))
         self.submarine = Submarine(self.fleet)
         self.submarine.set_rotation(self.rotate)
-        self.submarine.bind_to_tile(self.field.sprites()[66])
-        self.battleship = BattleShip(self.fleet)
-        self.battleship.set_rotation(self.rotate)
-        self.battleship.bind_to_tile(self.field.sprites()[41])
+        self.submarine.bind_to_point((400, 70))
         self.cruiser = Cruiser(self.fleet)
         self.cruiser.set_rotation(self.rotate)
-        self.cruiser.bind_to_tile(self.field.sprites()[35])
+        self.cruiser.bind_to_point((400, 120))
+        self.battleship = BattleShip(self.fleet)
+        self.battleship.set_rotation(self.rotate)
+        self.battleship.bind_to_point((400, 170))
         self.carrier = Carrier(self.fleet)
         self.carrier.set_rotation(self.rotate)
-        self.carrier.bind_to_tile(self.field.sprites()[73])
+        self.carrier.bind_to_point((400, 220))
         self.player_cursor = PlayerCursor()
 
     def main_loop(self):
@@ -64,23 +63,21 @@ class Game:
             screen.fill((0, 0, 0))
             player_cursor_arguments = []
             field_arguments = []
+            fleet_arguments = []
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.MOUSEMOTION:
                     player_cursor_arguments.append(event)
+                    fleet_arguments.append(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     field_arguments.append(event)
-                    self.rotate += 1
-                    self.rotate %= 6
-                    self.patrol_boat.set_rotation(self.rotate)
-                    self.submarine.set_rotation(self.rotate)
-                    self.cruiser.set_rotation(self.rotate)
-                    self.battleship.set_rotation(self.rotate)
-                    self.carrier.set_rotation(self.rotate)
+                    fleet_arguments.append(event)
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    fleet_arguments.append(event)
             player_cursor_group.update(*player_cursor_arguments)
             self.field.update(*field_arguments)
-            self.fleet.update()
+            self.fleet.update(*fleet_arguments, field=self.field)
             self.field.draw(screen)
             self.fleet.draw(screen)
             pygame.display.update()
@@ -164,14 +161,46 @@ class Fleet(pygame.sprite.Group):
 
 class Ship(pygame.sprite.Sprite):
     """Abstract class"""
+
     def __init__(self, fleet, image, length):
         super().__init__(fleet)
         self.length = length
         self.original_image = image
         self.image = self.original_image
         self.rect = self.image.get_rect()
+        self.mask = pygame.mask.from_surface(self.image)
         self.rotation = 0
         self.head_point = (0, 0)
+        self.bind_to_cursor = False
+
+    def update(self, *args, **kwargs):
+        for event in args:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == pygame.BUTTON_LEFT:
+                    if pygame.sprite.spritecollideany(self, player_cursor_group,
+                                                      (lambda s1, s2:
+                                                      pygame.sprite.collide_mask(s1, s2))):
+                        self.bind_to_cursor = True
+                        self.bind_to_point(event.pos)
+                elif event.button == pygame.BUTTON_WHEELDOWN:
+                    if self.bind_to_cursor:
+                        self.set_rotation(self.rotation - 1)
+                elif event.button == pygame.BUTTON_WHEELUP:
+                    if self.bind_to_cursor:
+                        self.set_rotation(self.rotation + 1)
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == pygame.BUTTON_LEFT:
+                    active_tiles = pygame.sprite.groupcollide(player_cursor_group, kwargs["field"],
+                                                              False, False,
+                                                              lambda s1, s2:
+                                                              pygame.sprite.collide_mask(s1, s2))
+                    if active_tiles and self.bind_to_cursor:
+                        self.bind_to_tile(list(active_tiles.values())[0][0])
+                    self.bind_to_cursor = False
+            elif event.type == pygame.MOUSEMOTION:
+                if self.bind_to_cursor:
+                    self.bind_to_point(event.pos)
+
 
     def get_coords(self):
         return self.rect.x, self.rect.y
@@ -196,6 +225,7 @@ class Ship(pygame.sprite.Sprite):
         self.image = rotate(self.original_image,
                             (14, self.original_image.get_height() // 2), 60 * self.rotation)
         self.rect = self.image.get_rect(center=pos)
+        self.mask = pygame.mask.from_surface(self.image)
         self.head_point = pos
 
     def bind_to_tile(self, tile):
