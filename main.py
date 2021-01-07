@@ -68,6 +68,7 @@ class Game:
                     btn_group_arguments.append(event)
                 elif event.type == pygame.MOUSEBUTTONUP:
                     fleet_arguments.append(event)
+                    btn_group_arguments.append(event)
             player_cursor_group.update(*player_cursor_arguments)
             self.field.update(*field_arguments, shooting=False)
             self.fleet.update(*fleet_arguments, field=self.field, moving=True)
@@ -194,8 +195,8 @@ class HexField(pygame.sprite.Group):
 
 
 class Fleet(pygame.sprite.Group):
-    def __init__(self, patrol_boats_count=4, destroyers_count=2, submarines_count=1,
-                 cruisers_count=2, battleships_count=1, carriers_count=1):
+    def __init__(self, patrol_boats_count=5, destroyers_count=2, submarines_count=2,
+                 cruisers_count=3, battleships_count=1, carriers_count=1):
         super().__init__()
         self.patrol_boats = [PatrolBoat(self) for _ in range(patrol_boats_count)]
         self.destroyers = [Destroyer(self) for _ in range(destroyers_count)]
@@ -244,7 +245,7 @@ class Ship(pygame.sprite.Sprite):
                 if event.button == pygame.BUTTON_LEFT:
                     if pygame.sprite.spritecollideany(self, player_cursor_group,
                                                       (lambda s1, s2:
-                                                      pygame.sprite.collide_mask(s1, s2))):
+                                                       pygame.sprite.collide_mask(s1, s2))):
                         if kwargs["moving"]:
                             self.set_bind_to_cursor(True)
                             self.bind_to_point(event.pos)
@@ -307,10 +308,15 @@ class Ship(pygame.sprite.Sprite):
             tiles.append(HexField.get_neighbor(tiles[-1], self.rotation))
         for tile_ in tiles:
             if not tile.get_field().cell_in_field(tile_):
-                print("Корабль за пределами поля!")
+                print("Корабль за пределами поля")
+                return
+            if tile.get_field().get_cell(tile_) == cst.SHIP_IN_CELL:
+                print("Наложение кораблей")
+                return
             for neighbor in tile.get_field().get_neighbors(tile_):
                 if tile.get_field().get_cell(neighbor) == cst.SHIP_IN_CELL:
-                    print("Соседство с кораблём!")
+                    print("Соседство с кораблём")
+                    return
         for tile_ in tiles:
             tile.get_field().set_cell(tile_, cst.SHIP_IN_CELL)
         self.head_tile = tile
@@ -327,6 +333,9 @@ class Ship(pygame.sprite.Sprite):
         if field.cell_in_field(tile):
             field.set_cell(tile, cst.EMPTY_CELL)
         self.head_tile = None
+
+    def get_head_tile(self):
+        return self.head_tile
 
 
 class PatrolBoat(Ship):
@@ -418,10 +427,11 @@ class SpawnShipButton(pygame.sprite.Sprite):
     def __init__(self, group, pos, ship_image, ships_list):
         super().__init__(group)
         self.ship_image = ship_image
+        self.original_image = self.make_original_image()
         self.ships_list = []
+        self.ships_in_field = []
         for ship in ships_list:
             self.add_ship(ship)
-        self.original_image = self.make_original_image()
         self.image = self.make_image()
         self.rect = self.original_image.get_rect()
         self.rect.x, self.rect.y = pos
@@ -429,10 +439,12 @@ class SpawnShipButton(pygame.sprite.Sprite):
     def add_ship(self, ship):
         self.ships_list.append(ship)
         ship.bind_to_point(cst.SHIP_STORAGE_COORDS)
+        self.image = self.make_image()
 
     def make_original_image(self):
         image = pygame.Surface((150, 50))
         image.fill((0, 147, 175))
+        pygame.draw.rect(image, (0, 0, 0), (0, 0, 150, 50), 1)
         image.blit(self.ship_image, ((150 - self.ship_image.get_width()) // 2,
                                      (50 - self.ship_image.get_height()) // 2))
         return image
@@ -457,7 +469,12 @@ class SpawnShipButton(pygame.sprite.Sprite):
                             ship = self.ships_list.pop()
                             ship.set_bind_to_cursor(True)
                             ship.bind_to_point(event.pos)
+                            self.ships_in_field.append(ship)
                             self.image = self.make_image()
+            elif event.type == pygame.MOUSEBUTTONUP:
+                for i, ship in reversed(list(enumerate(self.ships_in_field))):
+                    if ship.get_head_tile() is None:
+                        self.add_ship(self.ships_in_field.pop(i))
 
 
 if __name__ == '__main__':
