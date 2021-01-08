@@ -8,7 +8,6 @@ screen = pygame.display.set_mode((cst.WIDTH, cst.HEIGHT))
 pygame.display.set_caption(cst.WINDOW_CAPTION)
 
 player_cursor_group = pygame.sprite.GroupSingle()
-tiles_group = pygame.sprite.Group()
 
 
 def load_image(name, color_key=None):
@@ -36,10 +35,22 @@ def rotate(image, pos, angle):
 
 class Game:
     def __init__(self):
-        self.running = True
-        self.clock = pygame.time.Clock()
         self.field = HexField(10, 10, 12, 12)
         self.fleet = Fleet()
+        self.player_cursor = PlayerCursor()
+
+    def main_loop(self):
+        ShipPlacementWindow(self.field, self.fleet, self.player_cursor).main_loop()
+        pygame.quit()
+
+
+class ShipPlacementWindow:
+    def __init__(self, field, fleet, cursor):
+        self.field = field
+        self.fleet = fleet
+        self.player_cursor = cursor
+        self.running = True
+        self.clock = pygame.time.Clock()
         self.btn_group = ShipSpawnButtonGroup(self.fleet)
         self.btn_group.get_patrol_boats_btn().set_coords((cst.WIDTH - 150, 0))
         self.btn_group.get_destroyers_btn().set_coords((cst.WIDTH - 150, 50))
@@ -47,7 +58,6 @@ class Game:
         self.btn_group.get_cruisers_btn().set_coords((cst.WIDTH - 150, 150))
         self.btn_group.get_battleships_btn().set_coords((cst.WIDTH - 150, 200))
         self.btn_group.get_carriers_btn().set_coords((cst.WIDTH - 150, 250))
-        self.player_cursor = PlayerCursor()
 
     def main_loop(self):
         while self.running:
@@ -78,7 +88,6 @@ class Game:
             self.fleet.draw(screen)
             pygame.display.update()
             self.clock.tick(cst.FPS)
-        pygame.quit()
 
 
 class PlayerCursor(pygame.sprite.Sprite):
@@ -440,11 +449,12 @@ class SpawnShipButton(pygame.sprite.Sprite):
         self.image = self.make_image()
 
     def make_original_image(self):
-        image = pygame.Surface((150, 50))
+        width, height = 150, 50
+        image = pygame.Surface((width, height))
         image.fill((0, 147, 175))
-        pygame.draw.rect(image, (0, 0, 0), (0, 0, 150, 50), 1)
-        image.blit(self.ship_image, ((150 - self.ship_image.get_width()) // 2,
-                                     (50 - self.ship_image.get_height()) // 2))
+        pygame.draw.rect(image, (0, 0, 0), (0, 0, width, height), 1)
+        image.blit(self.ship_image, ((width - self.ship_image.get_width()) // 2,
+                                     (height - self.ship_image.get_height()) // 2))
         return image
 
     def make_image(self):
@@ -452,7 +462,7 @@ class SpawnShipButton(pygame.sprite.Sprite):
         text = font.render(str(len(self.ships_list)), True, (0, 0, 0))
         text_w = text.get_width()
         image = self.original_image.copy()
-        image.blit(text, (150 - text_w - 10, 10))
+        image.blit(text, (image.get_width() - text_w - 10, 10))
         return image
 
     def set_coords(self, pos):
