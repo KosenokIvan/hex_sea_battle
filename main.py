@@ -38,7 +38,7 @@ class Game:
     def __init__(self):
         self.running = True
         self.clock = pygame.time.Clock()
-        self.field = HexField(10, 10, 10, 10)
+        self.field = HexField(10, 10, 12, 12)
         self.fleet = Fleet()
         self.btn_group = ShipSpawnButtonGroup(self.fleet)
         self.btn_group.get_patrol_boats_btn().set_coords((cst.WIDTH - 150, 0))
@@ -308,14 +308,11 @@ class Ship(pygame.sprite.Sprite):
             tiles.append(HexField.get_neighbor(tiles[-1], self.rotation))
         for tile_ in tiles:
             if not tile.get_field().cell_in_field(tile_):
-                print("Корабль за пределами поля")
                 return
             if tile.get_field().get_cell(tile_) == cst.SHIP_IN_CELL:
-                print("Наложение кораблей")
                 return
             for neighbor in tile.get_field().get_neighbors(tile_):
                 if tile.get_field().get_cell(neighbor) == cst.SHIP_IN_CELL:
-                    print("Соседство с кораблём")
                     return
         for tile_ in tiles:
             tile.get_field().set_cell(tile_, cst.SHIP_IN_CELL)
@@ -438,6 +435,7 @@ class SpawnShipButton(pygame.sprite.Sprite):
 
     def add_ship(self, ship):
         self.ships_list.append(ship)
+        ship.set_rotation(cst.RIGHT)
         ship.bind_to_point(cst.SHIP_STORAGE_COORDS)
         self.image = self.make_image()
 
@@ -472,9 +470,10 @@ class SpawnShipButton(pygame.sprite.Sprite):
                             self.ships_in_field.append(ship)
                             self.image = self.make_image()
             elif event.type == pygame.MOUSEBUTTONUP:
-                for i, ship in reversed(list(enumerate(self.ships_in_field))):
-                    if ship.get_head_tile() is None:
-                        self.add_ship(self.ships_in_field.pop(i))
+                if event.button == pygame.BUTTON_LEFT:
+                    for i, ship in reversed(list(enumerate(self.ships_in_field))):
+                        if ship.get_head_tile() is None:
+                            self.add_ship(self.ships_in_field.pop(i))
 
 
 if __name__ == '__main__':
