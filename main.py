@@ -35,29 +35,44 @@ def rotate(image, pos, angle):
 
 class Game:
     def __init__(self):
-        self.field = HexField(10, 10, 12, 12)
-        self.fleet = Fleet()
+        self.field1 = HexField(10, 10, 12, 12)
+        self.fleet1 = Fleet()
+        self.field2 = HexField(10, 10, 12, 12)
+        self.fleet2 = Fleet()
         self.player_cursor = PlayerCursor()
 
     def main_loop(self):
-        ShipPlacementWindow(self.field, self.fleet, self.player_cursor).main_loop()
+        ShipPlacementScreen(self.field1, self.fleet1, self.player_cursor).main_loop()
+        ShipPlacementScreen(self.field2, self.fleet2, self.player_cursor).main_loop()
+        BattleScreen(self.field1, self.fleet1,
+                     self.field2, self.fleet2, self.player_cursor).main_loop()
         pygame.quit()
 
 
-class ShipPlacementWindow:
+class ShipPlacementScreen:
     def __init__(self, field, fleet, cursor):
         self.field = field
+        self.field.set_pos((10, 10))
         self.fleet = fleet
         self.player_cursor = cursor
         self.running = True
         self.clock = pygame.time.Clock()
-        self.btn_group = ShipSpawnButtonGroup(self.fleet)
-        self.btn_group.get_patrol_boats_btn().set_coords((cst.WIDTH - 150, 0))
-        self.btn_group.get_destroyers_btn().set_coords((cst.WIDTH - 150, 50))
-        self.btn_group.get_submarines_btn().set_coords((cst.WIDTH - 150, 100))
-        self.btn_group.get_cruisers_btn().set_coords((cst.WIDTH - 150, 150))
-        self.btn_group.get_battleships_btn().set_coords((cst.WIDTH - 150, 200))
-        self.btn_group.get_carriers_btn().set_coords((cst.WIDTH - 150, 250))
+        self.ship_spawn_btn_group = ShipSpawnButtonGroup(self.fleet)
+        self.ship_spawn_btn_group.get_patrol_boats_btn().set_coords((cst.WIDTH - 160, 10))
+        self.ship_spawn_btn_group.get_destroyers_btn().set_coords((cst.WIDTH - 160, 60))
+        self.ship_spawn_btn_group.get_submarines_btn().set_coords((cst.WIDTH - 160, 110))
+        self.ship_spawn_btn_group.get_cruisers_btn().set_coords((cst.WIDTH - 160, 160))
+        self.ship_spawn_btn_group.get_battleships_btn().set_coords((cst.WIDTH - 160, 210))
+        self.ship_spawn_btn_group.get_carriers_btn().set_coords((cst.WIDTH - 160, 260))
+        self.ui_group = pygame.sprite.Group()
+        self.next_screen_btn = InterfaceButton(self.ui_group, (150, 50),
+                                               cst.BTN_COLOR, "Продолжить", 1)
+        self.next_screen_btn.on_click(self.next_screen)
+        self.next_screen_btn.set_font(size=20)
+        self.next_screen_btn.set_coords((cst.WIDTH - 160, cst.HEIGHT - 60))
+        self.label = InterfaceLabel(self.ui_group, (300, 50), (0, 0, 0, 0))
+        self.label.set_font(size=20, color=(255, 0, 0))
+        self.label.set_coords(((cst.WIDTH - 460) // 2, cst.HEIGHT - 60))
 
     def main_loop(self):
         while self.running:
@@ -65,29 +80,94 @@ class ShipPlacementWindow:
             player_cursor_arguments = []
             field_arguments = []
             fleet_arguments = []
-            btn_group_arguments = []
+            ui_group_arguments = []
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                    exit()
                 elif event.type == pygame.MOUSEMOTION:
                     player_cursor_arguments.append(event)
                     fleet_arguments.append(event)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     field_arguments.append(event)
                     fleet_arguments.append(event)
-                    btn_group_arguments.append(event)
+                    ui_group_arguments.append(event)
                 elif event.type == pygame.MOUSEBUTTONUP:
                     fleet_arguments.append(event)
-                    btn_group_arguments.append(event)
+                    ui_group_arguments.append(event)
             player_cursor_group.update(*player_cursor_arguments)
             self.field.update(*field_arguments, shooting=False)
             self.fleet.update(*fleet_arguments, field=self.field, moving=True)
-            self.btn_group.update(*btn_group_arguments)
+            self.ship_spawn_btn_group.update(*ui_group_arguments)
+            self.ui_group.update(*ui_group_arguments)
             self.field.draw(screen)
-            self.btn_group.draw(screen)
+            self.ship_spawn_btn_group.draw(screen)
+            self.ui_group.draw(screen)
             self.fleet.draw(screen)
             pygame.display.update()
             self.clock.tick(cst.FPS)
+
+    def next_screen(self, event):
+        if event.button == pygame.BUTTON_LEFT:
+            ships = self.fleet.sprites()
+            if all(map(lambda ship: ship.get_head_tile() is not None, ships)):
+                self.running = False
+                return True
+            self.label.set_text("Не все корабли расставленны!")
+        return False
+
+
+class BattleScreen:
+    def __init__(self, field1, fleet1, field2, fleet2, player_cursor):
+        self.field1 = field1
+        self.field2 = field2
+        self.field1.set_pos((10, 10))
+        self.field2.set_pos((400, 10))
+        self.fleet1 = fleet1
+        self.fleet2 = fleet2
+        self.current_player = 1
+        self.player_cursor = player_cursor
+        self.running = True
+        self.clock = pygame.time.Clock()
+        self.ui_group = pygame.sprite.Group()
+
+    def main_loop(self):
+        while self.running:
+            screen.fill((0, 0, 0))
+            player_cursor_arguments = []
+            field_arguments = []
+            fleet_arguments = []
+            ui_group_arguments = []
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    exit()
+                elif event.type == pygame.MOUSEMOTION:
+                    player_cursor_arguments.append(event)
+                    fleet_arguments.append(event)
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    field_arguments.append(event)
+                    fleet_arguments.append(event)
+                    ui_group_arguments.append(event)
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    fleet_arguments.append(event)
+                    ui_group_arguments.append(event)
+            player_cursor_group.update(*player_cursor_arguments)
+            self.field1.update(*field_arguments, shooting=self.current_player == 2)
+            self.field2.update(*field_arguments, shooting=self.current_player == 1)
+            self.fleet1.update(*fleet_arguments, field=self.field1, moving=False)
+            self.fleet1.update(*fleet_arguments, field=self.field2, moving=False)
+            self.ui_group.update(*ui_group_arguments)
+            self.field1.draw(screen)
+            self.field2.draw(screen)
+            self.ui_group.draw(screen)
+            self.fleet1.draw(screen)
+            self.fleet2.draw(screen)
+            pygame.display.update()
+            self.clock.tick(cst.FPS)
+
+    def replace_current_player(self):
+        self.current_player = 1 if self.current_player == 2 else 2
 
 
 class PlayerCursor(pygame.sprite.Sprite):
@@ -118,6 +198,10 @@ class HexTile(pygame.sprite.Sprite):
         self.rect.x, self.rect.y = pos
         self.field_pos = field_pos
         self.mask = pygame.mask.from_surface(self.image)
+        self.ship = None
+
+    def set_ship(self, ship):
+        self.ship = ship
 
     def get_field(self):
         return self.field
@@ -148,22 +232,26 @@ class HexTile(pygame.sprite.Sprite):
     def get_coords(self):
         return self.rect.x, self.rect.y
 
+    def set_coords(self, pos):
+        self.rect.x, self.rect.y = pos
+        if self.ship is not None:
+            self.ship.bind_to_tile(self)
+
 
 class HexField(pygame.sprite.Group):
     def __init__(self, x, y, width, height):
         super().__init__()
-        self.x = x
-        self.y = y
         self.width = width
         self.height = height
         self.field = [[cst.EMPTY_CELL] * self.width for _ in range(self.height)]
-        self.create_field()
+        self.pos = x, y
+        self.create_field(x, y)
 
-    def create_field(self):
+    def create_field(self, field_x, field_y):
         for y in range(self.height):
             for x in range(self.width):
-                hex_x = x * 28 + self.x + (14 if y % 2 == 0 else 0)
-                hex_y = y * 24 + self.y
+                hex_x = x * 28 + field_x + (14 if y % 2 == 0 else 0)
+                hex_y = y * 24 + field_y
                 HexTile(self, (hex_x, hex_y), (x, y))
 
     @staticmethod
@@ -202,6 +290,13 @@ class HexField(pygame.sprite.Group):
             return
         self.field[pos[0]][pos[1]] = value
 
+    def set_pos(self, pos):
+        for sprite in self.sprites():
+            x, y = sprite.get_coords()
+            x += pos[0] - self.pos[0]
+            y += pos[1] - self.pos[1]
+            sprite.set_coords((x, y))
+
 
 class Fleet(pygame.sprite.Group):
     def __init__(self, patrol_boats_count=5, destroyers_count=2, submarines_count=2,
@@ -231,6 +326,10 @@ class Fleet(pygame.sprite.Group):
 
     def get_carriers(self):
         return self.carriers.copy()
+
+    def remove_all_ships_from_field(self):
+        for ship in self.sprites():
+            ship.remove_from_field()
 
 
 class Ship(pygame.sprite.Sprite):
@@ -309,10 +408,10 @@ class Ship(pygame.sprite.Sprite):
         self.head_point = pos
 
     def bind_to_tile(self, tile):
+        tiles = [tile.get_field_pos()]
         x, y = tile.get_coords()
         self.bind_to_point((x + HexTile.shallow_image.get_width() // 2,
                             y + HexTile.shallow_image.get_height() // 2))
-        tiles = [tile.get_field_pos()]
         for i in range(self.length - 1):
             tiles.append(HexField.get_neighbor(tiles[-1], self.rotation))
         for tile_ in tiles:
@@ -326,6 +425,7 @@ class Ship(pygame.sprite.Sprite):
         for tile_ in tiles:
             tile.get_field().set_cell(tile_, cst.SHIP_IN_CELL)
         self.head_tile = tile
+        tile.set_ship(self)
 
     def remove_from_field(self):
         if self.head_tile is None:
@@ -338,6 +438,7 @@ class Ship(pygame.sprite.Sprite):
             tile = field.get_neighbor(tile, self.rotation)
         if field.cell_in_field(tile):
             field.set_cell(tile, cst.EMPTY_CELL)
+        self.head_tile.set_ship(None)
         self.head_tile = None
 
     def get_head_tile(self):
@@ -429,17 +530,87 @@ class ShipSpawnButtonGroup(pygame.sprite.Group):
         return self.carriers_btn
 
 
-class SpawnShipButton(pygame.sprite.Sprite):
-    def __init__(self, group, pos, ship_image, ships_list):
+class InterfaceLabel(pygame.sprite.Sprite):
+    def __init__(self, group, size, color, text="", border_width=0, border_color=(0, 0, 0)):
         super().__init__(group)
+        self.width, self.height = size
+        self.text = text
+        self.font_color = (0, 0, 0)
+        self.font_size = 16
+        self.font_type = None
+        self.original_image = self.make_original_image(color, border_width, border_color)
+        self.image = self.make_image()
+        self.rect = self.image.get_rect()
+
+    def set_coords(self, pos):
+        self.rect.x, self.rect.y = pos
+
+    def make_original_image(self, color, border_width, border_color):
+        image = pygame.Surface((self.width, self.height))
+        image.fill(color)
+        if border_width != 0:
+            pygame.draw.rect(image, border_color, (0, 0, self.width, self.height), border_width)
+        return image
+
+    def make_image(self):
+        font = pygame.font.Font(self.font_type, self.font_size)
+        text = font.render(self.text, True, self.font_color)
+        text_w = text.get_width()
+        text_h = text.get_height()
+        image = self.original_image.copy()
+        image.blit(text, ((image.get_width() - text_w) // 2,
+                          (image.get_height() - text_h) // 2))
+        return image
+
+    def get_width(self):
+        return self.width
+
+    def get_height(self):
+        return self.height
+
+    def get_size(self):
+        return self.width, self.height
+
+    def get_text(self):
+        return self.text
+
+    def set_text(self, text):
+        self.text = text
+        self.image = self.make_image()
+
+    def get_font(self):
+        return self.font_type, self.font_size, self.font_color
+
+    def set_font(self, font_type=None, size=16, color=(0, 0, 0)):
+        self.font_type = font_type
+        self.font_size = size
+        self.font_color = color
+        self.image = self.make_image()
+
+
+class InterfaceButton(InterfaceLabel):
+    def __init__(self, group, size, color, text="", border_width=0, border_color=(0, 0, 0)):
+        super().__init__(group, size, color, text, border_width, border_color)
+        self.on_click_func = lambda ev: None
+
+    def on_click(self, func):
+        self.on_click_func = func
+
+    def update(self, *args, **kwargs):
+        for event in args:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.rect.collidepoint(event.pos):
+                    self.on_click_func(event)
+
+
+class SpawnShipButton(InterfaceLabel):
+    def __init__(self, group, pos, ship_image, ships_list):
         self.ship_image = ship_image
-        self.original_image = self.make_original_image()
         self.ships_list = []
+        super().__init__(group, (150, 50), cst.BTN_COLOR, "", 1)
         self.ships_in_field = []
         for ship in ships_list:
             self.add_ship(ship)
-        self.image = self.make_image()
-        self.rect = self.original_image.get_rect()
         self.rect.x, self.rect.y = pos
 
     def add_ship(self, ship):
@@ -448,13 +619,10 @@ class SpawnShipButton(pygame.sprite.Sprite):
         ship.bind_to_point(cst.SHIP_STORAGE_COORDS)
         self.image = self.make_image()
 
-    def make_original_image(self):
-        width, height = 150, 50
-        image = pygame.Surface((width, height))
-        image.fill((0, 147, 175))
-        pygame.draw.rect(image, (0, 0, 0), (0, 0, width, height), 1)
-        image.blit(self.ship_image, ((width - self.ship_image.get_width()) // 2,
-                                     (height - self.ship_image.get_height()) // 2))
+    def make_original_image(self, color, border_width, border_color):
+        image = super().make_original_image(color, border_width, border_color)
+        image.blit(self.ship_image, ((self.width - self.ship_image.get_width()) // 2,
+                                     (self.height - self.ship_image.get_height()) // 2))
         return image
 
     def make_image(self):
@@ -464,9 +632,6 @@ class SpawnShipButton(pygame.sprite.Sprite):
         image = self.original_image.copy()
         image.blit(text, (image.get_width() - text_w - 10, 10))
         return image
-
-    def set_coords(self, pos):
-        self.rect.x, self.rect.y = pos
 
     def update(self, *args, **kwargs):
         for event in args:

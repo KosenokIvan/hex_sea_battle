@@ -1,6 +1,6 @@
 WIDTH = 600
 HEIGHT = 600
-FPS = 60
+FPS = 30
 
 WINDOW_CAPTION = "Шестиугольный морской бой"
 
@@ -15,3 +15,5 @@ EMPTY_CELL = 0
 SHIP_IN_CELL = 1
 
 SHIP_STORAGE_COORDS = (-150, -50)
+
+BTN_COLOR = (0, 147, 175)
