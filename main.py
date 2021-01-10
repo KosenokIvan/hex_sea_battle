@@ -1,5 +1,6 @@
 import os
 import sys
+from random import randrange, choice
 import pygame
 import constants as cst
 
@@ -31,6 +32,19 @@ def rotate(image, pos, angle):
     image2 = pygame.Surface((width * 2, height * 2), pygame.SRCALPHA)
     image2.blit(image, (width - pos[0], height - pos[1]))
     return pygame.transform.rotate(image2, angle)
+
+
+def random_placement(fleet, field):
+    ships = (fleet.get_patrol_boats() + fleet.get_destroyers()
+             + fleet.get_submarines() + fleet.get_cruisers()
+             + fleet.get_battleships() + fleet.get_carriers())
+    for ship in ships:
+        ship.remove_from_field()
+        while True:
+            ship.set_rotation(randrange(0, 6))
+            ship.bind_to_tile(choice(field.sprites()))
+            if ship.get_head_tile() is not None:
+                break
 
 
 class Game:
@@ -70,9 +84,14 @@ class ShipPlacementScreen:
         self.next_screen_btn.on_click(self.next_screen)
         self.next_screen_btn.set_font(size=20)
         self.next_screen_btn.set_coords((cst.WIDTH - 160, cst.HEIGHT - 60))
-        self.label = InterfaceLabel(self.ui_group, (300, 50), (0, 0, 0, 0))
+        self.random_placement_btn = InterfaceButton(self.ui_group, (150, 50),
+                                                    cst.BTN_COLOR, "Случайная расстановка", 1)
+        self.random_placement_btn.on_click(self.random_placement)
+        self.random_placement_btn.set_font(size=20)
+        self.random_placement_btn.set_coords((cst.WIDTH - 320, cst.HEIGHT - 60))
+        self.label = InterfaceLabel(self.ui_group, (cst.WIDTH - 330, 50), (0, 0, 0, 0))
         self.label.set_font(size=20, color=(255, 0, 0))
-        self.label.set_coords(((cst.WIDTH - 460) // 2, cst.HEIGHT - 60))
+        self.label.set_coords((10, cst.HEIGHT - 60))
 
     def main_loop(self):
         while self.running:
@@ -107,6 +126,12 @@ class ShipPlacementScreen:
             pygame.display.update()
             self.clock.tick(cst.FPS)
 
+    def random_placement(self, event):
+        if event.button == pygame.BUTTON_LEFT:
+            random_placement(self.fleet, self.field)
+            for btn in self.ship_spawn_btn_group.sprites():
+                btn.move_ships_to_field()
+
     def next_screen(self, event):
         if event.button == pygame.BUTTON_LEFT:
             ships = self.fleet.sprites()
@@ -122,7 +147,7 @@ class BattleScreen:
         self.field1 = field1
         self.field2 = field2
         self.field1.set_pos((10, 10))
-        self.field2.set_pos((400, 10))
+        self.field2.set_pos((600, 10))
         self.fleet1 = fleet1
         self.fleet2 = fleet2
         self.current_player = 1
@@ -617,6 +642,12 @@ class SpawnShipButton(InterfaceLabel):
         self.ships_list.append(ship)
         ship.set_rotation(cst.RIGHT)
         ship.bind_to_point(cst.SHIP_STORAGE_COORDS)
+        self.image = self.make_image()
+
+    def move_ships_to_field(self):
+        for i, ship in reversed(list(enumerate(self.ships_list))):
+            self.ships_in_field.append(ship)
+            self.ships_list.pop(i)
         self.image = self.make_image()
 
     def make_original_image(self, color, border_width, border_color):
