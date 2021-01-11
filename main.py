@@ -162,6 +162,7 @@ class BattleScreen:
         self.field2.set_pos((10, 10))
         self.fleet1 = fleet1
         self.fleet2 = fleet2
+        self.explosion_group = ExplosionGroup()
         self.current_player = 1
         self.player_cursor = player_cursor
         self.running = True
@@ -197,18 +198,22 @@ class BattleScreen:
                     fleet_arguments.append(event)
                     ui_group_arguments.append(event)
             player_cursor_group.update(*player_cursor_arguments)
-            self.field1.update(*field_arguments, shooting=self.current_player == 2)
-            self.field2.update(*field_arguments, shooting=self.current_player == 1)
+            self.field1.update(*field_arguments, shooting=self.current_player == 2,
+                               explosion_group=self.explosion_group)
+            self.field2.update(*field_arguments, shooting=self.current_player == 1,
+                               explosion_group=self.explosion_group)
             self.fleet1.update(*fleet_arguments, field=self.field1, moving=False,
                                draw_alive=False, shooting=True)
             self.fleet2.update(*fleet_arguments, field=self.field2, moving=False,
                                draw_alive=False, shooting=True)
             self.ui_group.update(*ui_group_arguments)
+            self.explosion_group.update()
             self.field1.draw(screen)
             self.field2.draw(screen)
             self.ui_group.draw(screen)
             self.fleet1.draw(screen)
             self.fleet2.draw(screen)
+            self.explosion_group.draw(screen)
             fleet = self.fleet1 if self.current_player == 2 else self.fleet2
             if not fleet.check_alive():
                 self.label.set_text(f"Победил {self.current_player} игрок!")
@@ -260,6 +265,8 @@ class BattleScreen:
             self.current_player = 1
             self.field2.set_pos((10, 10))
             self.field1.set_pos((610, 10))
+        for explosion in self.explosion_group.sprites():
+            explosion.move_to_storage()
         self.label.set_text(f"Ходит {self.current_player} игрок")
 
 
@@ -320,6 +327,7 @@ class HexTile(pygame.sprite.Sprite):
 
     def update(self, *args, **kwargs):
         shooting = kwargs.get("shooting", False)
+        explosion_group = kwargs.get("explosion_group", None)
         self.is_active = pygame.sprite.spritecollideany(self,
                                                         player_cursor_group,
                                                         (lambda s1, s2:
@@ -331,6 +339,10 @@ class HexTile(pygame.sprite.Sprite):
                         self.is_fired_upon = True
                         if self.get_status() == cst.EMPTY_CELL:
                             self.field.set_move_is_end(True)
+                        elif explosion_group is not None:
+                            explosion = explosion_group.get_hitting_ship_explosion()
+                            explosion.set_is_active(True)
+                            explosion.set_coords((self.rect.x - 10, self.rect.y - 10))
         if self.is_active or self.is_fired_upon:
             self.image = self.deep_image
         else:
@@ -814,6 +826,106 @@ class SpawnShipButton(InterfaceLabel):
                     for i, ship in reversed(list(enumerate(self.ships_in_field))):
                         if ship.get_head_tile() is None:
                             self.add_ship(self.ships_in_field.pop(i))
+
+
+class Effect(pygame.sprite.Sprite):
+    def __init__(self, group, sprites_list, change_sprites_period, is_looped=False):
+        super().__init__(group)
+        self.sprites_list = [sprite for sprite in sprites_list]
+        self.is_looped = is_looped
+        self.sprite_index = 0
+        self.image = self.sprites_list[self.sprite_index]
+        self.rect = self.image.get_rect()
+        self.change_sprites_period = change_sprites_period
+        self.change_sprites_timer = 0
+        self.is_active = True
+
+    def get_is_active(self):
+        return self.is_active
+
+    def set_is_active(self, value):
+        self.is_active = value
+
+    def move_to_storage(self):
+        self.set_coords(cst.EFFECTS_STORAGE_COORDS)
+        self.set_is_active(False)
+        self.set_sprite_index(0)
+
+    def get_coords(self):
+        return self.rect.x, self.rect.y
+
+    def set_coords(self, coords):
+        self.rect.x, self.rect.y = coords
+
+    def update(self, *args, **kwargs):
+        if self.is_active:
+            self.change_sprites_timer += 1
+        if self.change_sprites_timer >= self.change_sprites_period:
+            self.change_sprites_timer = 0
+            self.sprite_index += 1
+            if self.is_looped:
+                self.sprite_index %= len(self.sprites_list)
+            elif self.sprite_index >= len(self.sprites_list):
+                self.image.fill(cst.TRANSPARENT)
+                return
+            self.image = self.sprites_list[self.sprite_index]
+
+    def is_finished(self):
+        if self.is_looped:
+            return False
+        return self.sprite_index >= len(self.sprites_list)
+
+    def set_sprite_index(self, index):
+        self.sprite_index = index
+        self.change_sprites_timer = 0
+
+
+class HittingShipExplosion(Effect):
+    sprites = [
+        load_image("effects/hitting_ship_explosion/0001.png"),
+        load_image("effects/hitting_ship_explosion/0002.png"),
+        load_image("effects/hitting_ship_explosion/0003.png"),
+        load_image("effects/hitting_ship_explosion/0004.png"),
+        load_image("effects/hitting_ship_explosion/0005.png"),
+        load_image("effects/hitting_ship_explosion/0006.png"),
+        load_image("effects/hitting_ship_explosion/0007.png"),
+        load_image("effects/hitting_ship_explosion/0008.png"),
+        load_image("effects/hitting_ship_explosion/0009.png"),
+        load_image("effects/hitting_ship_explosion/0010.png"),
+        load_image("effects/hitting_ship_explosion/0011.png"),
+        load_image("effects/hitting_ship_explosion/0012.png"),
+        load_image("effects/hitting_ship_explosion/0013.png"),
+        load_image("effects/hitting_ship_explosion/0014.png"),
+        load_image("effects/hitting_ship_explosion/0015.png"),
+        load_image("effects/hitting_ship_explosion/0016.png"),
+        load_image("effects/hitting_ship_explosion/0017.png"),
+        load_image("effects/hitting_ship_explosion/0018.png"),
+        load_image("effects/hitting_ship_explosion/0019.png"),
+        load_image("effects/hitting_ship_explosion/0020.png"),
+    ]
+
+    def __init__(self, group):
+        super().__init__(group, self.sprites, 5, False)
+
+
+class ExplosionGroup(pygame.sprite.Group):
+    def __init__(self):
+        super().__init__()
+        self.hitting_ship_explosions = [HittingShipExplosion(self)]
+        for sprite in self.sprites():
+            sprite.move_to_storage()
+
+    def get_hitting_ship_explosion(self):
+        return self.get_explosion(self.hitting_ship_explosions, HittingShipExplosion)
+
+    def get_explosion(self, explosions_list, explosion_type):
+        for explosion in explosions_list:
+            if not explosion.get_is_active():
+                return explosion
+        explosion = explosion_type(self)
+        explosion.move_to_storage()
+        explosions_list.append(explosion)
+        return explosion
 
 
 if __name__ == '__main__':
