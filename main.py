@@ -57,11 +57,61 @@ class Game:
         self.player_cursor = PlayerCursor()
 
     def main_loop(self):
-        ShipPlacementScreen(self.field1, self.fleet1, self.player_cursor).main_loop()
-        ShipPlacementScreen(self.field2, self.fleet2, self.player_cursor).main_loop()
-        BattleScreen(self.field1, self.fleet1,
-                     self.field2, self.fleet2, self.player_cursor).main_loop()
+        game_mode = MainMenuScreen().main_loop()
+        if game_mode == cst.ONE_PLAYER:
+            ShipPlacementScreen(self.field1, self.fleet1, self.player_cursor).main_loop()
+            random_placement(self.fleet2, self.field2)
+            SinglePlayerBattleScreen(self.field1, self.fleet1,
+                                     self.field2, self.fleet2, self.player_cursor).main_loop()
+        elif game_mode == cst.TWO_PLAYERS:
+            ShipPlacementScreen(self.field1, self.fleet1, self.player_cursor).main_loop()
+            ShipPlacementScreen(self.field2, self.fleet2, self.player_cursor).main_loop()
+            MultiPlayerBattleScreen(self.field1, self.fleet1,
+                                    self.field2, self.fleet2, self.player_cursor).main_loop()
         pygame.quit()
+
+
+class MainMenuScreen:
+    def __init__(self):
+        self.running = True
+        self.clock = pygame.time.Clock()
+        self.ui_group = pygame.sprite.Group()
+        self.single_player_btn = InterfaceButton(self.ui_group,
+                                                 (cst.BTN_SIZE[0] * 2, cst.BTN_SIZE[1]),
+                                                 cst.BTN_COLOR, "Один игрок", 1)
+        self.single_player_btn.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], 200))
+        self.single_player_btn.on_click(lambda ev: self.on_click_set_mode(ev, cst.ONE_PLAYER))
+        self.multi_player_btn = InterfaceButton(self.ui_group,
+                                                (cst.BTN_SIZE[0] * 2, cst.BTN_SIZE[1]),
+                                                cst.BTN_COLOR, "Два игрока", 1)
+        self.multi_player_btn.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], cst.BTN_SIZE[1] + 210))
+        self.multi_player_btn.on_click(lambda ev: self.on_click_set_mode(ev, cst.TWO_PLAYERS))
+        self.game_mode = cst.UNKNOWN_MODE
+
+    def main_loop(self):
+        while self.running:
+            if self.game_mode != cst.UNKNOWN_MODE:
+                return self.game_mode
+            screen.fill(cst.BLACK)
+            ui_group_arguments = []
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    ui_group_arguments.append(event)
+            self.ui_group.update(*ui_group_arguments)
+            self.ui_group.draw(screen)
+            pygame.display.update()
+            self.clock.tick(cst.FPS)
+
+    def set_mode(self, value):
+        self.game_mode = value
+
+    def on_click_set_mode(self, event, value):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == pygame.BUTTON_LEFT:
+                self.set_mode(value)
 
 
 class ShipPlacementScreen:
@@ -154,12 +204,12 @@ class ShipPlacementScreen:
         return False
 
 
-class BattleScreen:
+class MultiPlayerBattleScreen:
     def __init__(self, field1, fleet1, field2, fleet2, player_cursor):
         self.field1 = field1
         self.field2 = field2
-        self.field1.set_pos((610, 10))
-        self.field2.set_pos((10, 10))
+        self.field1.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
+        self.field2.set_pos(cst.ACTIVE_FIELD_COORDS)
         self.fleet1 = fleet1
         self.fleet2 = fleet2
         self.explosion_group = ExplosionGroup()
@@ -251,6 +301,7 @@ class BattleScreen:
             self.field2.update(shooting=False)
             self.fire_group1.update()
             self.fire_group2.update()
+            self.explosion_group.update()
             self.field1.draw(screen)
             self.field2.draw(screen)
             self.ui_group.draw(screen)
@@ -260,6 +311,7 @@ class BattleScreen:
                 self.fire_group2.draw(screen)
             else:
                 self.fire_group1.draw(screen)
+            self.explosion_group.draw(screen)
             pygame.display.update()
             self.clock.tick(cst.FPS)
 
@@ -273,15 +325,163 @@ class BattleScreen:
         self.field2.set_move_is_end(False)
         if self.current_player == 1:
             self.current_player = 2
-            self.field1.set_pos((10, 10))
-            self.field2.set_pos((610, 10))
+            self.field1.set_pos(cst.ACTIVE_FIELD_COORDS)
+            self.field2.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
         else:
             self.current_player = 1
-            self.field2.set_pos((10, 10))
-            self.field1.set_pos((610, 10))
+            self.field2.set_pos(cst.ACTIVE_FIELD_COORDS)
+            self.field1.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
         for explosion in self.explosion_group.sprites():
             explosion.move_to_storage()
         self.label.set_text(f"Ходит {self.current_player} игрок")
+
+
+class SinglePlayerBattleScreen:
+    def __init__(self, field1, fleet1, field2, fleet2, player_cursor):
+        self.field1 = field1
+        self.field2 = field2
+        self.field1.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
+        self.field2.set_pos(cst.ACTIVE_FIELD_COORDS)
+        self.fleet1 = fleet1
+        self.fleet2 = fleet2
+        self.ai_player = AIPlayer(self.fleet1, self.field1)
+        self.explosion_group = ExplosionGroup()
+        self.fire_group1 = FireGroup()
+        self.fire_group2 = FireGroup()
+        self.current_player = 1
+        self.player_cursor = player_cursor
+        self.running = True
+        self.game_running = True
+        self.clock = pygame.time.Clock()
+        self.ui_group = pygame.sprite.Group()
+        self.label = InterfaceLabel(self.ui_group, (cst.BTN_SIZE[0] * 2, cst.BTN_SIZE[1]),
+                                    cst.TRANSPARENT)
+        self.label.set_font(color=cst.GREEN)
+        self.label.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+        self.label.set_text("Ваш ход" if self.current_player == 1 else "Ход противника")
+
+    def main_loop(self):
+        while self.game_running:
+            screen.fill(cst.BLACK)
+            player_cursor_arguments = []
+            field_arguments = []
+            fleet_arguments = []
+            ui_group_arguments = []
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.game_running = False
+                    self.running = False
+                    exit()
+                elif event.type == pygame.MOUSEMOTION:
+                    player_cursor_arguments.append(event)
+                    fleet_arguments.append(event)
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    field_arguments.append(event)
+                    fleet_arguments.append(event)
+                    ui_group_arguments.append(event)
+                elif event.type == pygame.MOUSEBUTTONUP:
+                    fleet_arguments.append(event)
+                    ui_group_arguments.append(event)
+            player_cursor_group.update(*player_cursor_arguments)
+            self.field1.update(*field_arguments, shooting=False,
+                               explosion_group=self.explosion_group, fire_group=self.fire_group1)
+            self.field2.update(*field_arguments, shooting=self.current_player == 1,
+                               explosion_group=self.explosion_group, fire_group=self.fire_group2)
+            self.fleet1.update(*fleet_arguments, field=self.field1, moving=False,
+                               draw_alive=False, shooting=True)
+            self.fleet2.update(*fleet_arguments, field=self.field2, moving=False,
+                               draw_alive=False, shooting=True)
+            self.ui_group.update(*ui_group_arguments)
+            self.explosion_group.update()
+            self.fire_group1.update()
+            self.fire_group2.update()
+            self.field1.draw(screen)
+            self.field2.draw(screen)
+            self.ui_group.draw(screen)
+            self.fleet1.draw(screen)
+            self.fleet2.draw(screen)
+            if self.current_player == 1:
+                self.fire_group2.draw(screen)
+            else:
+                self.fire_group1.draw(screen)
+            self.explosion_group.draw(screen)
+            fleet = self.fleet1 if self.current_player == 2 else self.fleet2
+            if not fleet.check_alive():
+                self.label.set_text("Вы победили" if self.current_player == 1 else "Вы проиграли")
+                self.game_running = False
+            elif self.check_player_shot():
+                self.replace_current_player()
+            pygame.display.update()
+            self.clock.tick(cst.FPS)
+        self.after_game_loop()
+
+    def after_game_loop(self):
+        while self.running:
+            screen.fill(cst.BLACK)
+            ui_group_arguments = []
+            player_cursor_arguments = []
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    ui_group_arguments.append(event)
+                elif event.type == pygame.MOUSEMOTION:
+                    player_cursor_arguments.append(event)
+            self.ui_group.update(*ui_group_arguments)
+            player_cursor_group.update(*player_cursor_arguments)
+            self.field1.update(shooting=False)
+            self.field2.update(shooting=False)
+            self.fire_group1.update()
+            self.fire_group2.update()
+            self.explosion_group.update()
+            self.field1.draw(screen)
+            self.field2.draw(screen)
+            self.ui_group.draw(screen)
+            self.fleet1.draw(screen)
+            self.fleet2.draw(screen)
+            if self.current_player == 1:
+                self.fire_group2.draw(screen)
+            else:
+                self.fire_group1.draw(screen)
+            self.explosion_group.draw(screen)
+            pygame.display.update()
+            self.clock.tick(cst.FPS)
+
+    def check_player_shot(self):
+        if self.current_player == 1:
+            return self.field2.get_move_is_end()
+        return self.field1.get_move_is_end()
+
+    def replace_current_player(self):
+        self.field1.set_move_is_end(False)
+        self.field2.set_move_is_end(False)
+        if self.current_player == 1:
+            self.current_player = 2
+            self.field1.set_pos(cst.ACTIVE_FIELD_COORDS)
+            self.field2.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
+            while not self.field1.get_move_is_end():
+                tile = self.ai_player.choice_tile()
+                tile.on_click(self.explosion_group, self.fire_group1)
+        else:
+            self.current_player = 1
+            self.field2.set_pos(cst.ACTIVE_FIELD_COORDS)
+            self.field1.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
+        for explosion in self.explosion_group.sprites():
+            explosion.move_to_storage()
+        self.label.set_text("Ваш ход" if self.current_player == 1 else "Ход противника")
+
+
+class AIPlayer:
+    def __init__(self, enemy_fleet, enemy_field):
+        self.enemy_fleet = enemy_fleet
+        self.enemy_field = enemy_field
+
+    def choice_tile(self):
+        while True:
+            tile = choice(self.enemy_field.sprites())
+            if not tile.get_is_fired_upon():
+                return tile
 
 
 class PlayerCursor(pygame.sprite.Sprite):
@@ -350,28 +550,35 @@ class HexTile(pygame.sprite.Sprite):
         for event in args:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
-                    if self.is_active and shooting and not self.is_fired_upon:
-                        self.is_fired_upon = True
-                        if self.get_status() == cst.EMPTY_CELL:
-                            self.field.set_move_is_end(True)
-                        else:
-                            if fire_group is not None:
-                                fire = fire_group.get_hitting_ship_fire()
-                                fire.set_is_active(True)
-                                fire.set_coords((self.rect.x + (self.image.get_width() - 16) // 2,
-                                                 self.rect.y
-                                                 + (self.image.get_height() - 16) // 2 - 2))
-                            if explosion_group is not None:
-                                explosion = explosion_group.get_hitting_ship_explosion()
-                                explosion.set_is_active(True)
-                                explosion.set_coords((self.rect.x
-                                                      + (self.image.get_width() - 64) // 2,
-                                                      self.rect.y
-                                                      + (self.image.get_height() - 64) // 2))
+                    if shooting and self.is_active:
+                        self.on_click(explosion_group, fire_group)
         if self.is_active or self.is_fired_upon:
             self.image = self.deep_image
         else:
             self.image = self.shallow_image
+
+    def on_click(self, explosion_group, fire_group):
+        if not self.is_fired_upon:
+            self.is_fired_upon = True
+            if self.get_status() == cst.EMPTY_CELL:
+                self.field.set_move_is_end(True)
+            else:
+                if fire_group is not None:
+                    self.spawn_fire(fire_group)
+                if explosion_group is not None:
+                    self.spawn_explosion(explosion_group)
+
+    def spawn_fire(self, fire_group):
+        fire = fire_group.get_hitting_ship_fire()
+        fire.set_is_active(True)
+        fire.set_coords((self.rect.x + (self.image.get_width() - 32) // 2,
+                         self.rect.y + (self.image.get_height() - 32) // 2 - 10))
+
+    def spawn_explosion(self, explosion_group):
+        explosion = explosion_group.get_hitting_ship_explosion()
+        explosion.set_is_active(True)
+        explosion.set_coords((self.rect.x + (self.image.get_width() - 64) // 2,
+                              self.rect.y + (self.image.get_height() - 64) // 2))
 
     def get_coords(self):
         return self.rect.x, self.rect.y
@@ -828,7 +1035,7 @@ class SpawnShipButton(InterfaceLabel):
         return image
 
     def make_image(self):
-        font = pygame.font.Font(None, 16)
+        font = pygame.font.Font(None, cst.FONT_SIZE)
         text = font.render(str(len(self.ships_list)), True, cst.BLACK)
         text_w = text.get_width()
         image = self.original_image.copy()
@@ -955,7 +1162,8 @@ class ExplosionGroup(pygame.sprite.Group):
 
 
 class HittingShipFire(Effect):
-    sprites = [load_image(f"effects/hitting_ship_fire/{str(x).rjust(4, '0')}.png")
+    sprites = [pygame.transform.scale2x(load_image(f"effects/hitting_ship_fire/"
+                                                   f"{str(x).rjust(4, '0')}.png"))
                for x in range(1, 130)]
 
     def __init__(self, group):
