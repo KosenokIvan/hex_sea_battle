@@ -208,8 +208,8 @@ class MultiPlayerBattleScreen:
     def __init__(self, field1, fleet1, field2, fleet2, player_cursor):
         self.field1 = field1
         self.field2 = field2
-        self.field1.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
-        self.field2.set_pos(cst.ACTIVE_FIELD_COORDS)
+        self.field1.set_pos((10, 10))
+        self.field2.set_pos((410, 10))
         self.fleet1 = fleet1
         self.fleet2 = fleet2
         self.explosion_group = ExplosionGroup()
@@ -267,10 +267,8 @@ class MultiPlayerBattleScreen:
             self.ui_group.draw(screen)
             self.fleet1.draw(screen)
             self.fleet2.draw(screen)
-            if self.current_player == 1:
-                self.fire_group2.draw(screen)
-            else:
-                self.fire_group1.draw(screen)
+            self.fire_group2.draw(screen)
+            self.fire_group1.draw(screen)
             self.explosion_group.draw(screen)
             fleet = self.fleet1 if self.current_player == 2 else self.fleet2
             if not fleet.check_alive():
@@ -307,10 +305,8 @@ class MultiPlayerBattleScreen:
             self.ui_group.draw(screen)
             self.fleet1.draw(screen)
             self.fleet2.draw(screen)
-            if self.current_player == 1:
-                self.fire_group2.draw(screen)
-            else:
-                self.fire_group1.draw(screen)
+            self.fire_group2.draw(screen)
+            self.fire_group1.draw(screen)
             self.explosion_group.draw(screen)
             pygame.display.update()
             self.clock.tick(cst.FPS)
@@ -325,14 +321,8 @@ class MultiPlayerBattleScreen:
         self.field2.set_move_is_end(False)
         if self.current_player == 1:
             self.current_player = 2
-            self.field1.set_pos(cst.ACTIVE_FIELD_COORDS)
-            self.field2.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
         else:
             self.current_player = 1
-            self.field2.set_pos(cst.ACTIVE_FIELD_COORDS)
-            self.field1.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
-        for explosion in self.explosion_group.sprites():
-            explosion.move_to_storage()
         self.label.set_text(f"Ходит {self.current_player} игрок")
 
 
@@ -340,8 +330,8 @@ class SinglePlayerBattleScreen:
     def __init__(self, field1, fleet1, field2, fleet2, player_cursor):
         self.field1 = field1
         self.field2 = field2
-        self.field1.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
-        self.field2.set_pos(cst.ACTIVE_FIELD_COORDS)
+        self.field1.set_pos((10, 10))
+        self.field2.set_pos((410, 10))
         self.fleet1 = fleet1
         self.fleet2 = fleet2
         self.ai_player = AIPlayer(self.fleet1, self.field1)
@@ -388,7 +378,7 @@ class SinglePlayerBattleScreen:
             self.field2.update(*field_arguments, shooting=self.current_player == 1,
                                explosion_group=self.explosion_group, fire_group=self.fire_group2)
             self.fleet1.update(*fleet_arguments, field=self.field1, moving=False,
-                               draw_alive=False, shooting=True)
+                               draw_alive=True, shooting=True)
             self.fleet2.update(*fleet_arguments, field=self.field2, moving=False,
                                draw_alive=False, shooting=True)
             self.ui_group.update(*ui_group_arguments)
@@ -400,10 +390,8 @@ class SinglePlayerBattleScreen:
             self.ui_group.draw(screen)
             self.fleet1.draw(screen)
             self.fleet2.draw(screen)
-            if self.current_player == 1:
-                self.fire_group2.draw(screen)
-            else:
-                self.fire_group1.draw(screen)
+            self.fire_group2.draw(screen)
+            self.fire_group1.draw(screen)
             self.explosion_group.draw(screen)
             fleet = self.fleet1 if self.current_player == 2 else self.fleet2
             if not fleet.check_alive():
@@ -440,10 +428,8 @@ class SinglePlayerBattleScreen:
             self.ui_group.draw(screen)
             self.fleet1.draw(screen)
             self.fleet2.draw(screen)
-            if self.current_player == 1:
-                self.fire_group2.draw(screen)
-            else:
-                self.fire_group1.draw(screen)
+            self.fire_group2.draw(screen)
+            self.fire_group1.draw(screen)
             self.explosion_group.draw(screen)
             pygame.display.update()
             self.clock.tick(cst.FPS)
@@ -458,17 +444,11 @@ class SinglePlayerBattleScreen:
         self.field2.set_move_is_end(False)
         if self.current_player == 1:
             self.current_player = 2
-            self.field1.set_pos(cst.ACTIVE_FIELD_COORDS)
-            self.field2.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
             while not self.field1.get_move_is_end():
                 tile = self.ai_player.choice_tile()
                 tile.on_click(self.explosion_group, self.fire_group1)
         else:
             self.current_player = 1
-            self.field2.set_pos(cst.ACTIVE_FIELD_COORDS)
-            self.field1.set_pos(cst.NOT_ACTIVE_FIELD_COORDS)
-        for explosion in self.explosion_group.sprites():
-            explosion.move_to_storage()
         self.label.set_text("Ваш ход" if self.current_player == 1 else "Ход противника")
 
 
@@ -562,11 +542,13 @@ class HexTile(pygame.sprite.Sprite):
             self.is_fired_upon = True
             if self.get_status() == cst.EMPTY_CELL:
                 self.field.set_move_is_end(True)
+                if explosion_group is not None:
+                    self.spawn_miss_explosion(explosion_group)
             else:
                 if fire_group is not None:
                     self.spawn_fire(fire_group)
                 if explosion_group is not None:
-                    self.spawn_explosion(explosion_group)
+                    self.spawn_hitting_ship_explosion(explosion_group)
 
     def spawn_fire(self, fire_group):
         fire = fire_group.get_hitting_ship_fire()
@@ -574,11 +556,17 @@ class HexTile(pygame.sprite.Sprite):
         fire.set_coords((self.rect.x + (self.image.get_width() - 32) // 2,
                          self.rect.y + (self.image.get_height() - 32) // 2 - 10))
 
-    def spawn_explosion(self, explosion_group):
+    def spawn_hitting_ship_explosion(self, explosion_group):
         explosion = explosion_group.get_hitting_ship_explosion()
         explosion.set_is_active(True)
         explosion.set_coords((self.rect.x + (self.image.get_width() - 64) // 2,
                               self.rect.y + (self.image.get_height() - 64) // 2))
+
+    def spawn_miss_explosion(self, explosion_group):
+        explosion = explosion_group.get_miss_explosion()
+        explosion.set_is_active(True)
+        explosion.set_coords((self.rect.x + (self.image.get_width() - 64) // 2,
+                              self.rect.y + (self.image.get_height() - 64) // 2 - 25))
 
     def get_coords(self):
         return self.rect.x, self.rect.y
@@ -1114,28 +1102,16 @@ class Effect(pygame.sprite.Sprite):
 
 
 class HittingShipExplosion(Effect):
-    sprites = [
-        load_image("effects/hitting_ship_explosion/0001.png"),
-        load_image("effects/hitting_ship_explosion/0002.png"),
-        load_image("effects/hitting_ship_explosion/0003.png"),
-        load_image("effects/hitting_ship_explosion/0004.png"),
-        load_image("effects/hitting_ship_explosion/0005.png"),
-        load_image("effects/hitting_ship_explosion/0006.png"),
-        load_image("effects/hitting_ship_explosion/0007.png"),
-        load_image("effects/hitting_ship_explosion/0008.png"),
-        load_image("effects/hitting_ship_explosion/0009.png"),
-        load_image("effects/hitting_ship_explosion/0010.png"),
-        load_image("effects/hitting_ship_explosion/0011.png"),
-        load_image("effects/hitting_ship_explosion/0012.png"),
-        load_image("effects/hitting_ship_explosion/0013.png"),
-        load_image("effects/hitting_ship_explosion/0014.png"),
-        load_image("effects/hitting_ship_explosion/0015.png"),
-        load_image("effects/hitting_ship_explosion/0016.png"),
-        load_image("effects/hitting_ship_explosion/0017.png"),
-        load_image("effects/hitting_ship_explosion/0018.png"),
-        load_image("effects/hitting_ship_explosion/0019.png"),
-        load_image("effects/hitting_ship_explosion/0020.png"),
-    ]
+    sprites = [load_image(f"effects/hitting_ship_explosion/{str(x).rjust(4, '0')}.png")
+               for x in range(1, 20)]
+
+    def __init__(self, group):
+        super().__init__(group, self.sprites, 5, False)
+
+
+class MissExplosion(Effect):
+    sprites = [load_image(f"effects/miss_explosion/{str(x).rjust(4, '0')}.png")
+               for x in range(1, 36)]
 
     def __init__(self, group):
         super().__init__(group, self.sprites, 5, False)
@@ -1145,11 +1121,15 @@ class ExplosionGroup(pygame.sprite.Group):
     def __init__(self):
         super().__init__()
         self.hitting_ship_explosions = [HittingShipExplosion(self) for _ in range(5)]
+        self.miss_explosions = [MissExplosion(self) for _ in range(2)]
         for sprite in self.sprites():
             sprite.move_to_storage()
 
     def get_hitting_ship_explosion(self):
         return self.get_explosion(self.hitting_ship_explosions, HittingShipExplosion)
+
+    def get_miss_explosion(self):
+        return self.get_explosion(self.miss_explosions, MissExplosion)
 
     def get_explosion(self, explosions_list, explosion_type):
         for explosion in explosions_list:
