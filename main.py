@@ -57,17 +57,27 @@ class Game:
         self.fleet2 = Fleet()
         self.player_cursor = PlayerCursor()
         self.background = BackgroundImage()
+        self.running = True
 
     def main_loop(self):
-        game_mode = MainMenuScreen().main_loop()
-        if game_mode == cst.ONE_PLAYER:
-            ShipPlacementScreen(self.field1, self.fleet1).main_loop()
-            random_placement(self.fleet2, self.field2)
-            SinglePlayerBattleScreen(self.field1, self.fleet1, self.field2, self.fleet2).main_loop()
-        elif game_mode == cst.TWO_PLAYERS:
-            ShipPlacementScreen(self.field1, self.fleet1).main_loop()
-            ShipPlacementScreen(self.field2, self.fleet2).main_loop()
-            MultiPlayerBattleScreen(self.field1, self.fleet1, self.field2, self.fleet2).main_loop()
+        while self.running:
+            game_mode = MainMenuScreen().main_loop()
+            if game_mode == cst.ONE_PLAYER:
+                status = ShipPlacementScreen(self.field1, self.fleet1).main_loop()
+                if status == cst.TO_MAIN_MENU:
+                    continue
+                random_placement(self.fleet2, self.field2)
+                SinglePlayerBattleScreen(self.field1, self.fleet1,
+                                         self.field2, self.fleet2).main_loop()
+            elif game_mode == cst.TWO_PLAYERS:
+                status = ShipPlacementScreen(self.field1, self.fleet1).main_loop()
+                if status == cst.TO_MAIN_MENU:
+                    continue
+                status = ShipPlacementScreen(self.field2, self.fleet2).main_loop()
+                if status == cst.TO_MAIN_MENU:
+                    continue
+                MultiPlayerBattleScreen(self.field1, self.fleet1,
+                                        self.field2, self.fleet2).main_loop()
         pygame.quit()
 
 
@@ -131,20 +141,35 @@ class ShipPlacementScreen:
         self.ship_spawn_btn_group.get_battleships_btn().set_coords((x, cst.BTN_SIZE[1] * 4 + 10))
         self.ship_spawn_btn_group.get_carriers_btn().set_coords((x, cst.BTN_SIZE[1] * 5 + 10))
         self.ui_group = pygame.sprite.Group()
+        self.label = InterfaceLabel(self.ui_group,
+                                    (cst.WIDTH - 30 - cst.BTN_SIZE[0], cst.BTN_SIZE[1]),
+                                    cst.TRANSPARENT)
+        self.to_main_menu_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
+                                                cst.BTN_COLOR, "Вернуться в главное меню", 1)
+        self.random_placement_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
+                                                    cst.BTN_COLOR, "Случайная расстановка", 1)
+        self.clear_field_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
+                                               cst.BTN_COLOR, "Очистить поле", 1)
         self.next_screen_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
                                                cst.BTN_COLOR, "Продолжить", 1)
+        self.init_ui()
+        self.status = cst.TO_NEXT_SCREEN
+
+    def init_ui(self):
+        self.label.set_font(size=cst.LABEL_FONT_SIZE, color=cst.RED)
+        self.label.set_coords((10, cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+        self.to_main_menu_btn.on_click(self.to_main_menu)
+        self.to_main_menu_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
+                                          cst.HEIGHT - (cst.BTN_SIZE[1] + 10) * 4))
+        self.random_placement_btn.on_click(self.random_placement)
+        self.random_placement_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
+                                              cst.HEIGHT - (cst.BTN_SIZE[1] + 10) * 3))
+        self.clear_field_btn.on_click(self.clear_field)
+        self.clear_field_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
+                                         cst.HEIGHT - (cst.BTN_SIZE[1] + 10) * 2))
         self.next_screen_btn.on_click(self.next_screen)
         self.next_screen_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
                                          cst.HEIGHT - cst.BTN_SIZE[1] - 10))
-        self.random_placement_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
-                                                    cst.BTN_COLOR, "Случайная расстановка", 1)
-        self.random_placement_btn.on_click(self.random_placement)
-        self.random_placement_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] * 2 - 20,
-                                              cst.HEIGHT - cst.BTN_SIZE[1] - 10))
-        self.label = InterfaceLabel(self.ui_group, (cst.WIDTH - cst.BTN_SIZE[0] * 2 - 40,
-                                                    cst.BTN_SIZE[1]), cst.TRANSPARENT)
-        self.label.set_font(color=cst.RED)
-        self.label.set_coords((10, cst.HEIGHT - cst.BTN_SIZE[1] - 10))
 
     def main_loop(self):
         while self.running:
@@ -187,6 +212,7 @@ class ShipPlacementScreen:
             self.fleet.draw(screen)
             pygame.display.update()
             self.clock.tick(cst.FPS)
+        return self.status
 
     def random_placement(self, event):
         if event.button == pygame.BUTTON_LEFT:
@@ -200,9 +226,21 @@ class ShipPlacementScreen:
             ships = self.fleet.sprites()
             if all(map(lambda ship: ship.get_head_tile() is not None, ships)):
                 self.running = False
+                self.status = cst.TO_NEXT_SCREEN
                 return True
             self.label.set_text("Не все корабли расставленны!")
         return False
+
+    def to_main_menu(self, event):
+        if event.button == pygame.BUTTON_LEFT:
+            self.clear_field(event)
+            self.running = False
+            self.status = cst.TO_MAIN_MENU
+
+    def clear_field(self, event):
+        if event.button == pygame.BUTTON_LEFT:
+            for ship in self.fleet.sprites():
+                ship.remove_from_field()
 
 
 class BattleScreen:
@@ -224,12 +262,37 @@ class BattleScreen:
         self.ui_group = pygame.sprite.Group()
         self.label = InterfaceLabel(self.ui_group, (cst.BTN_SIZE[0] * 2, cst.BTN_SIZE[1]),
                                     cst.TRANSPARENT)
-        self.label.set_font(color=cst.GREEN)
-        self.label.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+        self.to_main_menu_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
+                                                cst.BTN_COLOR, "Вернуться в главное меню", 1)
+        self.init_ui()
         self.update_label_text()
 
+    def init_ui(self):
+        self.label.set_font(size=cst.LABEL_FONT_SIZE, color=cst.GREEN)
+        self.label.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+        self.to_main_menu_btn.on_click(self.to_main_menu)
+        self.to_main_menu_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
+                                          cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+
+    def to_main_menu(self, event):
+        if event.button == pygame.BUTTON_LEFT:
+            self.running = False
+            self.game_running = False
+            for ship in self.fleet1.sprites():
+                ship.remove_from_field()
+                ship.set_is_alive(True)
+            for ship in self.fleet2.sprites():
+                ship.remove_from_field()
+                ship.set_is_alive(True)
+            for tile in self.field1.sprites():
+                tile.set_is_fired_upon(False)
+            for tile in self.field2.sprites():
+                tile.set_is_fired_upon(False)
+            self.field1.set_move_is_end(False)
+            self.field2.set_move_is_end(False)
+
     def main_loop(self):
-        while self.running:
+        while self.game_running:
             player_cursor_arguments = []
             field_arguments = []
             fleet_arguments = []
@@ -294,7 +357,10 @@ class BattleScreen:
         self.field2.update(shooting=False)
         self.fire_group1.update()
         self.fire_group2.update()
-        self.explosion_group.update()
+        self.fleet1.update(draw_alive=True)
+        self.fleet2.update(draw_alive=True)
+        self.explosion_group1.update()
+        self.explosion_group2.update()
 
     def after_game_draw_sprites(self):
         background_group.draw(screen)
@@ -305,7 +371,8 @@ class BattleScreen:
         self.fleet2.draw(screen)
         self.fire_group2.draw(screen)
         self.fire_group1.draw(screen)
-        self.explosion_group.draw(screen)
+        self.explosion_group1.draw(screen)
+        self.explosion_group2.draw(screen)
 
     def update_label_text(self):
         pass
@@ -798,6 +865,9 @@ class Ship(pygame.sprite.Sprite):
     def get_is_alive(self):
         return self.is_alive
 
+    def set_is_alive(self, value):
+        self.is_alive = value
+
     def check_is_alive(self):
         tiles = self.get_tiles()
         return any(map(lambda tile: not tile.get_is_fired_upon(), tiles))
@@ -911,7 +981,7 @@ class InterfaceLabel(pygame.sprite.Sprite):
         self.width, self.height = size
         self.text = text
         self.font_color = cst.BLACK
-        self.font_size = cst.FONT_SIZE
+        self.font_size = cst.BTN_FONT_SIZE
         self.font_type = None
         self.original_image = self.make_original_image(color, border_width, border_color)
         self.image = self.make_image()
@@ -958,7 +1028,7 @@ class InterfaceLabel(pygame.sprite.Sprite):
     def get_font(self):
         return self.font_type, self.font_size, self.font_color
 
-    def set_font(self, font_type=None, size=cst.FONT_SIZE, color=cst.BLACK):
+    def set_font(self, font_type=None, size=cst.BTN_FONT_SIZE, color=cst.BLACK):
         self.font_type = font_type
         self.font_size = size
         self.font_color = color
@@ -1009,7 +1079,7 @@ class SpawnShipButton(InterfaceLabel):
         return image
 
     def make_image(self):
-        font = pygame.font.Font(None, cst.FONT_SIZE)
+        font = pygame.font.Font(None, cst.BTN_FONT_SIZE)
         text = font.render(str(len(self.ships_list)), True, cst.BLACK)
         text_w = text.get_width()
         image = self.original_image.copy()
