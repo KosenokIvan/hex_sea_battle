@@ -49,6 +49,22 @@ def random_placement(fleet, field):
                 break
 
 
+def reverse_rotation(rotation):
+    if rotation == cst.LEFT:
+        return cst.RIGHT
+    elif rotation == cst.RIGHT:
+        return cst.LEFT
+    elif rotation == cst.LEFT_TOP:
+        return cst.RIGHT_DOWN
+    elif rotation == cst.RIGHT_DOWN:
+        return cst.LEFT_TOP
+    elif rotation == cst.LEFT_DOWN:
+        return cst.RIGHT_TOP
+    elif rotation == cst.RIGHT_TOP:
+        return cst.LEFT_DOWN
+    return None
+
+
 class Game:
     def __init__(self):
         self.field1 = HexField(10, 10, 12, 12)
@@ -445,6 +461,7 @@ class SinglePlayerBattleScreen(BattleScreen):
     def __init__(self, field1, fleet1, field2, fleet2):
         super().__init__(field1, fleet1, field2, fleet2)
         self.ai_player = AIPlayer(self.fleet1, self.field1)
+        self.ai_player_timer = 0
 
     def update_label_text(self):
         self.label.set_text("Ваш ход" if self.current_player == 1 else "Ход противника")
@@ -454,6 +471,12 @@ class SinglePlayerBattleScreen(BattleScreen):
 
     def update_sprites(self, player_cursor_arguments, field_arguments,
                        fleet_arguments, ui_group_arguments):
+        if self.current_player == 2:
+            self.ai_player_timer += 1
+            if self.ai_player_timer >= cst.AI_PLAYER_SHOOT_PERIOD:
+                self.ai_player_timer = 0
+                tile = self.ai_player.choice_tile()
+                tile.on_click(self.explosion_group1, self.fire_group1)
         background_group.update()
         player_cursor_group.update(*player_cursor_arguments)
         self.field1.update(*field_arguments, shooting=False,
@@ -482,28 +505,59 @@ class SinglePlayerBattleScreen(BattleScreen):
         self.explosion_group1.draw(screen)
         self.explosion_group2.draw(screen)
 
-    def replace_current_player(self):
-        self.field1.set_move_is_end(False)
-        self.field2.set_move_is_end(False)
-        if self.current_player == 1:
-            while not self.field1.get_move_is_end():
-                tile = self.ai_player.choice_tile()
-                tile.on_click(self.explosion_group1, self.fire_group1)
-        else:
-            self.current_player = 1
-        self.update_label_text()
-
 
 class AIPlayer:
     def __init__(self, enemy_fleet, enemy_field):
         self.enemy_fleet = enemy_fleet
         self.enemy_field = enemy_field
+        self.ship_tile = None
+        self.rotation = None
+        self.is_reversed = False
 
     def choice_tile(self):
         while True:
-            tile = choice(self.enemy_field.sprites())
-            if not tile.get_is_fired_upon():
+            if self.ship_tile is None:
+                tile = choice(self.enemy_field.sprites())
+                if not tile.get_is_fired_upon():
+                    if tile.get_status() == cst.SHIP_IN_CELL:
+                        self.ship_tile = tile
+                    return tile
+                continue
+            elif self.rotation is None:
+                rotations = list(range(6))
+                for i in range(6):
+                    rotation = choice(rotations)
+                    rotations.remove(rotation)
+                    tile_pos = self.enemy_field.get_neighbor(self.ship_tile.get_field_pos(),
+                                                             rotation)
+                    if self.enemy_field.cell_in_field(tile_pos):
+                        tile_ = self.enemy_field.get_cell(tile_pos)
+                        if not tile_.get_is_fired_upon():
+                            tile = tile_
+                            if tile.get_status() == cst.SHIP_IN_CELL:
+                                self.ship_tile = tile
+                                self.rotation = rotation
+                            return tile
+                self.ship_tile = None
+                continue
+            tile = self.ship_tile
+            while tile.get_is_fired_upon():
+                tile_pos = self.enemy_field.get_neighbor(tile.get_field_pos(), self.rotation)
+                new_tile = self.enemy_field.get_cell(tile_pos)
+                if (new_tile is None
+                        or new_tile.get_is_fired_upon() and new_tile.get_status() == cst.EMPTY_CELL):
+                    if self.is_reversed:
+                        self.ship_tile = None
+                        self.rotation = None
+                        self.is_reversed = False
+                        break
+                    self.is_reversed = True
+                    self.rotation = reverse_rotation(self.rotation)
+                if new_tile is not None:
+                    tile = new_tile
+            else:
                 return tile
+            continue
 
 
 class BackgroundImage(pygame.sprite.Sprite):
