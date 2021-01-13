@@ -112,10 +112,11 @@ class MainMenuScreen:
         self.game_mode = cst.UNKNOWN_MODE
 
     def init_ui(self):
-        self.single_player_btn.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], 200))
+        self.single_player_btn.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0],
+                                           cst.HEIGHT // 2 - cst.BTN_SIZE[1] - 5))
         self.single_player_btn.on_click(lambda ev: self.on_click_set_mode(ev, cst.ONE_PLAYER))
         self.single_player_btn.set_font(size=cst.BTN_FONT_SIZE)
-        self.multi_player_btn.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], cst.BTN_SIZE[1] + 210))
+        self.multi_player_btn.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], cst.HEIGHT // 2 + 5))
         self.multi_player_btn.on_click(lambda ev: self.on_click_set_mode(ev, cst.TWO_PLAYERS))
         self.multi_player_btn.set_font(size=cst.BTN_FONT_SIZE)
 
@@ -835,7 +836,7 @@ class Ship(pygame.sprite.Sprite):
         for event in args:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
-                    self.on_click(moving)
+                    self.on_click(event, moving)
                 elif event.button == pygame.BUTTON_WHEELDOWN:
                     if self.bind_to_cursor:
                         self.set_rotation(self.rotation - 1)
@@ -856,7 +857,7 @@ class Ship(pygame.sprite.Sprite):
         if self.is_alive and not draw_alive:
             self.image.fill(cst.TRANSPARENT)
 
-    def on_click(self, moving):
+    def on_click(self, event, moving):
         if pygame.sprite.spritecollideany(self, player_cursor_group,
                                           (lambda s1, s2: pygame.sprite.collide_mask(s1, s2))):
             if moving:
