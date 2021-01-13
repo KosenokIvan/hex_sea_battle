@@ -105,14 +105,19 @@ class MainMenuScreen:
         self.single_player_btn = InterfaceButton(self.ui_group,
                                                  (cst.BTN_SIZE[0] * 2, cst.BTN_SIZE[1]),
                                                  cst.BTN_COLOR, "Один игрок", 1)
-        self.single_player_btn.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], 200))
-        self.single_player_btn.on_click(lambda ev: self.on_click_set_mode(ev, cst.ONE_PLAYER))
         self.multi_player_btn = InterfaceButton(self.ui_group,
                                                 (cst.BTN_SIZE[0] * 2, cst.BTN_SIZE[1]),
                                                 cst.BTN_COLOR, "Два игрока", 1)
+        self.init_ui()
+        self.game_mode = cst.UNKNOWN_MODE
+
+    def init_ui(self):
+        self.single_player_btn.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], 200))
+        self.single_player_btn.on_click(lambda ev: self.on_click_set_mode(ev, cst.ONE_PLAYER))
+        self.single_player_btn.set_font(size=cst.BTN_FONT_SIZE)
         self.multi_player_btn.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], cst.BTN_SIZE[1] + 210))
         self.multi_player_btn.on_click(lambda ev: self.on_click_set_mode(ev, cst.TWO_PLAYERS))
-        self.game_mode = cst.UNKNOWN_MODE
+        self.multi_player_btn.set_font(size=cst.BTN_FONT_SIZE)
 
     def main_loop(self):
         while self.running:
@@ -172,20 +177,24 @@ class ShipPlacementScreen:
         self.status = cst.TO_NEXT_SCREEN
 
     def init_ui(self):
-        self.label.set_font(size=cst.LABEL_FONT_SIZE, color=cst.RED)
+        self.label.set_font(color=cst.RED)
         self.label.set_coords((10, cst.HEIGHT - cst.BTN_SIZE[1] - 10))
         self.to_main_menu_btn.on_click(self.to_main_menu)
         self.to_main_menu_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
                                           cst.HEIGHT - (cst.BTN_SIZE[1] + 10) * 4))
+        self.to_main_menu_btn.set_font(size=cst.BTN_FONT_SIZE)
         self.random_placement_btn.on_click(self.random_placement)
         self.random_placement_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
                                               cst.HEIGHT - (cst.BTN_SIZE[1] + 10) * 3))
+        self.random_placement_btn.set_font(size=cst.BTN_FONT_SIZE)
         self.clear_field_btn.on_click(self.clear_field)
         self.clear_field_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
                                          cst.HEIGHT - (cst.BTN_SIZE[1] + 10) * 2))
+        self.clear_field_btn.set_font(size=cst.BTN_FONT_SIZE)
         self.next_screen_btn.on_click(self.next_screen)
         self.next_screen_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
                                          cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+        self.next_screen_btn.set_font(size=cst.BTN_FONT_SIZE)
 
     def main_loop(self):
         while self.running:
@@ -278,17 +287,22 @@ class BattleScreen:
         self.ui_group = pygame.sprite.Group()
         self.label = InterfaceLabel(self.ui_group, (cst.BTN_SIZE[0] * 2, cst.BTN_SIZE[1]),
                                     cst.TRANSPARENT)
+        self.game_result_label = InterfaceLabel(self.ui_group, (cst.WIDTH // 2, cst.HEIGHT // 2),
+                                                cst.TRANSPARENT)
         self.to_main_menu_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
                                                 cst.BTN_COLOR, "Вернуться в главное меню", 1)
         self.init_ui()
         self.update_label_text()
 
     def init_ui(self):
-        self.label.set_font(size=cst.LABEL_FONT_SIZE, color=cst.GREEN)
+        self.label.set_font(color=cst.GREEN)
         self.label.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+        self.game_result_label.set_font(size=cst.GAME_RESULT_LABEL_FONT_SIZE, color=cst.GREEN)
+        self.game_result_label.set_coords((cst.WIDTH // 4, cst.HEIGHT // 4))
         self.to_main_menu_btn.on_click(self.to_main_menu)
         self.to_main_menu_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
                                           cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+        self.to_main_menu_btn.set_font(size=cst.BTN_FONT_SIZE)
 
     def to_main_menu(self, event):
         if event.button == pygame.BUTTON_LEFT:
@@ -419,7 +433,8 @@ class MultiPlayerBattleScreen(BattleScreen):
         self.label.set_text(f"Ходит {self.current_player} игрок")
 
     def set_game_result_msg(self):
-        self.label.set_text(f"Победил {self.current_player} игрок!")
+        self.label.set_text("")
+        self.game_result_label.set_text(f"Победил {self.current_player} игрок!")
 
     def update_sprites(self, player_cursor_arguments, field_arguments,
                        fleet_arguments, ui_group_arguments):
@@ -443,13 +458,13 @@ class MultiPlayerBattleScreen(BattleScreen):
         background_group.draw(screen)
         self.field1.draw(screen)
         self.field2.draw(screen)
-        self.ui_group.draw(screen)
         self.fleet1.draw(screen)
         self.fleet2.draw(screen)
         self.fire_group2.draw(screen)
         self.fire_group1.draw(screen)
         self.explosion_group1.draw(screen)
         self.explosion_group2.draw(screen)
+        self.ui_group.draw(screen)
 
     def check_player_shot(self):
         if self.current_player == 1:
@@ -467,7 +482,13 @@ class SinglePlayerBattleScreen(BattleScreen):
         self.label.set_text("Ваш ход" if self.current_player == 1 else "Ход противника")
 
     def set_game_result_msg(self):
-        self.label.set_text("Вы победили!" if self.current_player == 1 else "Вы проиграли!")
+        self.label.set_text("")
+        if self.current_player == 1:
+            self.game_result_label.set_font(size=cst.GAME_RESULT_LABEL_FONT_SIZE, color=cst.GREEN)
+            self.game_result_label.set_text("Вы победили!")
+        else:
+            self.game_result_label.set_font(size=cst.GAME_RESULT_LABEL_FONT_SIZE, color=cst.RED)
+            self.game_result_label.set_text("Вы проиграли!")
 
     def update_sprites(self, player_cursor_arguments, field_arguments,
                        fleet_arguments, ui_group_arguments):
@@ -497,13 +518,13 @@ class SinglePlayerBattleScreen(BattleScreen):
         background_group.draw(screen)
         self.field1.draw(screen)
         self.field2.draw(screen)
-        self.ui_group.draw(screen)
         self.fleet1.draw(screen)
         self.fleet2.draw(screen)
         self.fire_group2.draw(screen)
         self.fire_group1.draw(screen)
         self.explosion_group1.draw(screen)
         self.explosion_group2.draw(screen)
+        self.ui_group.draw(screen)
 
 
 class AIPlayer:
@@ -814,12 +835,7 @@ class Ship(pygame.sprite.Sprite):
         for event in args:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
-                    if pygame.sprite.spritecollideany(self, player_cursor_group,
-                                                      (lambda s1, s2:
-                                                       pygame.sprite.collide_mask(s1, s2))):
-                        if moving:
-                            self.set_bind_to_cursor(True)
-                            self.bind_to_point(event.pos)
+                    self.on_click(moving)
                 elif event.button == pygame.BUTTON_WHEELDOWN:
                     if self.bind_to_cursor:
                         self.set_rotation(self.rotation - 1)
@@ -828,13 +844,7 @@ class Ship(pygame.sprite.Sprite):
                         self.set_rotation(self.rotation + 1)
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == pygame.BUTTON_LEFT and field is not None:
-                    active_tiles = pygame.sprite.groupcollide(player_cursor_group, field,
-                                                              False, False,
-                                                              lambda s1, s2:
-                                                              pygame.sprite.collide_mask(s1, s2))
-                    if active_tiles and self.bind_to_cursor:
-                        self.bind_to_tile(list(active_tiles.values())[0][0])
-                    self.bind_to_cursor = False
+                    self.on_button_up(field)
             elif event.type == pygame.MOUSEMOTION:
                 if self.bind_to_cursor:
                     self.bind_to_point(event.pos)
@@ -845,6 +855,22 @@ class Ship(pygame.sprite.Sprite):
                 self.mark_neighboring_cells()
         if self.is_alive and not draw_alive:
             self.image.fill(cst.TRANSPARENT)
+
+    def on_click(self, moving):
+        if pygame.sprite.spritecollideany(self, player_cursor_group,
+                                          (lambda s1, s2: pygame.sprite.collide_mask(s1, s2))):
+            if moving:
+                self.set_bind_to_cursor(True)
+                self.bind_to_point(event.pos)
+
+    def on_button_up(self, field):
+        active_tiles = pygame.sprite.groupcollide(player_cursor_group, field,
+                                                  False, False,
+                                                  lambda s1, s2:
+                                                  pygame.sprite.collide_mask(s1, s2))
+        if active_tiles and self.bind_to_cursor:
+            self.bind_to_tile(list(active_tiles.values())[0][0])
+        self.bind_to_cursor = False
 
     def set_bind_to_cursor(self, value):
         self.bind_to_cursor = value
@@ -1035,7 +1061,7 @@ class InterfaceLabel(pygame.sprite.Sprite):
         self.width, self.height = size
         self.text = text
         self.font_color = cst.BLACK
-        self.font_size = cst.BTN_FONT_SIZE
+        self.font_size = cst.LABEL_FONT_SIZE
         self.font_type = None
         self.original_image = self.make_original_image(color, border_width, border_color)
         self.image = self.make_image()
@@ -1082,7 +1108,7 @@ class InterfaceLabel(pygame.sprite.Sprite):
     def get_font(self):
         return self.font_type, self.font_size, self.font_color
 
-    def set_font(self, font_type=None, size=cst.BTN_FONT_SIZE, color=cst.BLACK):
+    def set_font(self, font_type=None, size=cst.LABEL_FONT_SIZE, color=cst.BLACK):
         self.font_type = font_type
         self.font_size = size
         self.font_color = color
