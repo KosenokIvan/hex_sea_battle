@@ -13,6 +13,7 @@ background_group = pygame.sprite.GroupSingle()
 
 
 def load_image(name, color_key=None):
+    """Загрузка изображений"""
     fullname = os.path.join('data', name)
     if not os.path.isfile(fullname):
         print(f"Файл с изображением '{fullname}' не найден")
@@ -29,6 +30,7 @@ def load_image(name, color_key=None):
 
 
 def rotate(image, pos, angle):
+    """Поворот изображения относиельно выбранной точки"""
     width, height = image.get_size()
     image2 = pygame.Surface((width * 2, height * 2), pygame.SRCALPHA)
     image2.blit(image, (width - pos[0], height - pos[1]))
@@ -36,6 +38,7 @@ def rotate(image, pos, angle):
 
 
 def random_placement(fleet, field):
+    """Случайное размещение кораблей на поле"""
     ships = (fleet.get_carriers() + fleet.get_battleships()
              + fleet.get_cruisers() + fleet.get_submarines()
              + fleet.get_destroyers() + fleet.get_patrol_boats())
@@ -50,6 +53,7 @@ def random_placement(fleet, field):
 
 
 def reverse_rotation(rotation):
+    """Возвращает направление, противоположное данному"""
     if rotation == cst.LEFT:
         return cst.RIGHT
     elif rotation == cst.RIGHT:
@@ -66,6 +70,7 @@ def reverse_rotation(rotation):
 
 
 class Game:
+    """Основной класс игры"""
     def __init__(self):
         self.field1 = HexField(10, 10, 12, 12)
         self.fleet1 = Fleet()
@@ -122,7 +127,7 @@ class MainMenuScreen:
 
     def main_loop(self):
         while self.running:
-            if self.game_mode != cst.UNKNOWN_MODE:
+            if self.game_mode != cst.UNKNOWN_MODE:  # Если выбран противник(человек или компьютер)
                 return self.game_mode
             ui_group_arguments = []
             for event in pygame.event.get():
@@ -131,12 +136,18 @@ class MainMenuScreen:
                     exit()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     ui_group_arguments.append(event)
-            background_group.update()
-            self.ui_group.update(*ui_group_arguments)
-            background_group.draw(screen)
-            self.ui_group.draw(screen)
+            self.update_sprites(ui_group_arguments)
+            self.draw_sprites()
             pygame.display.update()
             self.clock.tick(cst.FPS)
+
+    def update_sprites(self, ui_group_arguments):
+        background_group.update()
+        self.ui_group.update(*ui_group_arguments)
+
+    def draw_sprites(self):
+        background_group.draw(screen)
+        self.ui_group.draw(screen)
 
     def set_mode(self, value):
         self.game_mode = value
@@ -148,6 +159,7 @@ class MainMenuScreen:
 
 
 class ShipPlacementScreen:
+    """Экран расстановки кораблей"""
     def __init__(self, field, fleet):
         self.field = field
         self.field.set_pos((10, 10))
@@ -155,13 +167,6 @@ class ShipPlacementScreen:
         self.running = True
         self.clock = pygame.time.Clock()
         self.ship_spawn_btn_group = ShipSpawnButtonGroup(self.fleet)
-        x = cst.WIDTH - cst.BTN_SIZE[0] - 10
-        self.ship_spawn_btn_group.get_patrol_boats_btn().set_coords((x, 10))
-        self.ship_spawn_btn_group.get_destroyers_btn().set_coords((x, cst.BTN_SIZE[1] + 10))
-        self.ship_spawn_btn_group.get_submarines_btn().set_coords((x, cst.BTN_SIZE[1] * 2 + 10))
-        self.ship_spawn_btn_group.get_cruisers_btn().set_coords((x, cst.BTN_SIZE[1] * 3 + 10))
-        self.ship_spawn_btn_group.get_battleships_btn().set_coords((x, cst.BTN_SIZE[1] * 4 + 10))
-        self.ship_spawn_btn_group.get_carriers_btn().set_coords((x, cst.BTN_SIZE[1] * 5 + 10))
         self.ui_group = pygame.sprite.Group()
         self.errors_label = InterfaceLabel(self.ui_group,
                                            (cst.WIDTH - 30 - cst.BTN_SIZE[0], cst.BTN_SIZE[1]),
@@ -175,9 +180,16 @@ class ShipPlacementScreen:
         self.next_screen_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
                                                cst.BTN_COLOR, "Продолжить", 1)
         self.init_ui()
-        self.status = cst.TO_NEXT_SCREEN
+        self.status = cst.TO_NEXT_SCREEN  # Куда перейти - на следующий экран или в главное меню
 
     def init_ui(self):
+        x = cst.WIDTH - cst.BTN_SIZE[0] - 10
+        self.ship_spawn_btn_group.get_patrol_boats_btn().set_coords((x, 10))
+        self.ship_spawn_btn_group.get_destroyers_btn().set_coords((x, cst.BTN_SIZE[1] + 10))
+        self.ship_spawn_btn_group.get_submarines_btn().set_coords((x, cst.BTN_SIZE[1] * 2 + 10))
+        self.ship_spawn_btn_group.get_cruisers_btn().set_coords((x, cst.BTN_SIZE[1] * 3 + 10))
+        self.ship_spawn_btn_group.get_battleships_btn().set_coords((x, cst.BTN_SIZE[1] * 4 + 10))
+        self.ship_spawn_btn_group.get_carriers_btn().set_coords((x, cst.BTN_SIZE[1] * 5 + 10))
         self.errors_label.set_font(color=cst.RED)
         self.errors_label.set_coords((10, cst.HEIGHT - cst.BTN_SIZE[1] - 10))
         self.to_main_menu_btn.on_click(self.to_main_menu)
@@ -217,30 +229,42 @@ class ShipPlacementScreen:
                 elif event.type == pygame.MOUSEBUTTONUP:
                     fleet_arguments.append(event)
                     ui_group_arguments.append(event)
-            place_ship_result = self.field.get_place_ship_result()
-            if place_ship_result == cst.SHIP_OUTSIDE_FIELD:
-                self.errors_label.set_text("Корабль за пределами поля!")
-            elif place_ship_result == cst.SHIPS_OVERLAY:
-                self.errors_label.set_text("Наложение кораблей!")
-            elif place_ship_result == cst.SHIPS_NEIGHBORHOOD:
-                self.errors_label.set_text("Соседство кораблей!")
-            self.field.set_place_ship_result(cst.SUCCESS)
-            background_group.update()
-            player_cursor_group.update(*player_cursor_arguments)
-            self.field.update(*field_arguments, shooting=False)
-            self.fleet.update(*fleet_arguments, field=self.field, moving=True, draw_alive=True)
-            self.ship_spawn_btn_group.update(*ui_group_arguments)
-            self.ui_group.update(*ui_group_arguments)
-            background_group.draw(screen)
-            self.field.draw(screen)
-            self.ship_spawn_btn_group.draw(screen)
-            self.ui_group.draw(screen)
-            self.fleet.draw(screen)
+            self.check_place_ship_result()
+            self.update_sprites(player_cursor_arguments, field_arguments,
+                                fleet_arguments, ui_group_arguments)
+            self.draw_sprites()
             pygame.display.update()
             self.clock.tick(cst.FPS)
         return self.status
 
+    def update_sprites(self, player_cursor_arguments, field_arguments,
+                       fleet_arguments, ui_group_arguments):
+        background_group.update()
+        player_cursor_group.update(*player_cursor_arguments)
+        self.field.update(*field_arguments, shooting=False)
+        self.fleet.update(*fleet_arguments, field=self.field, moving=True, draw_alive=True)
+        self.ship_spawn_btn_group.update(*ui_group_arguments)
+        self.ui_group.update(*ui_group_arguments)
+
+    def draw_sprites(self):
+        background_group.draw(screen)
+        self.field.draw(screen)
+        self.ship_spawn_btn_group.draw(screen)
+        self.ui_group.draw(screen)
+        self.fleet.draw(screen)
+
+    def check_place_ship_result(self):
+        place_ship_result = self.field.get_place_ship_result()
+        if place_ship_result == cst.SHIP_OUTSIDE_FIELD:
+            self.errors_label.set_text("Корабль за пределами поля!")
+        elif place_ship_result == cst.SHIPS_OVERLAY:
+            self.errors_label.set_text("Наложение кораблей!")
+        elif place_ship_result == cst.SHIPS_NEIGHBORHOOD:
+            self.errors_label.set_text("Соседство кораблей!")
+        self.field.set_place_ship_result(cst.SUCCESS)
+
     def random_placement(self, event):
+        """Нажатие на кнопку случайной расстановки"""
         if event.button == pygame.BUTTON_LEFT:
             random_placement(self.fleet, self.field)
             for btn in self.ship_spawn_btn_group.sprites():
@@ -248,17 +272,18 @@ class ShipPlacementScreen:
             self.field.set_place_ship_result(cst.SUCCESS)
 
     def next_screen(self, event):
+        """Нажатие на кнопку перехода на следующий экран"""
         if event.button == pygame.BUTTON_LEFT:
             ships = self.fleet.sprites()
             if all(map(lambda ship: ship.get_head_tile() is not None, ships)):
                 self.running = False
                 self.status = cst.TO_NEXT_SCREEN
                 self.field.set_place_ship_result(cst.SUCCESS)
-                return True
-            self.errors_label.set_text("Не все корабли расставленны!")
-        return False
+            else:
+                self.errors_label.set_text("Не все корабли расставленны!")
 
     def to_main_menu(self, event):
+        """Нажатие на кнопку возврата в меню"""
         if event.button == pygame.BUTTON_LEFT:
             self.clear_field(event)
             self.running = False
@@ -266,12 +291,14 @@ class ShipPlacementScreen:
             self.field.set_place_ship_result(cst.SUCCESS)
 
     def clear_field(self, event):
+        """Нажатие на кнопку очистки поля"""
         if event.button == pygame.BUTTON_LEFT:
             for ship in self.fleet.sprites():
                 ship.remove_from_field()
 
 
 class BattleScreen:
+    """Абстрактный класс экрана игрового процесса"""
     def __init__(self, field1, fleet1, field2, fleet2):
         self.field1 = field1
         self.field2 = field2
@@ -284,8 +311,8 @@ class BattleScreen:
         self.fire_group1 = FireGroup()
         self.fire_group2 = FireGroup()
         self.current_player = 1
-        self.running = True
-        self.game_running = True
+        self.running = True  # Экран активен
+        self.game_running = True  # Текущая игра не завершена
         self.clock = pygame.time.Clock()
         self.ui_group = pygame.sprite.Group()
         self.current_player_label = InterfaceLabel(self.ui_group,
@@ -310,6 +337,7 @@ class BattleScreen:
         self.to_main_menu_btn.set_font(size=cst.BTN_FONT_SIZE)
 
     def to_main_menu(self, event):
+        """Нажатие на кнопку возврата в меню. Сброс параметров кораблей и поля"""
         if event.button == pygame.BUTTON_LEFT:
             self.running = False
             self.game_running = False
@@ -352,15 +380,18 @@ class BattleScreen:
             self.update_sprites(player_cursor_arguments, field_arguments,
                                 fleet_arguments, ui_group_arguments)
             self.draw_sprites()
-            fleet = self.fleet1 if self.current_player == 2 else self.fleet2
-            if not fleet.check_alive():
-                self.set_game_result_msg()
-                self.game_running = False
-            elif self.check_player_shot():
-                self.replace_current_player()
+            self.check_game_over()
             pygame.display.update()
             self.clock.tick(cst.FPS)
         self.after_game_loop()
+
+    def check_game_over(self):
+        fleet = self.fleet1 if self.current_player == 2 else self.fleet2
+        if not fleet.check_alive():
+            self.set_game_result_msg()
+            self.game_running = False
+        elif self.check_move_is_end():
+            self.replace_current_player()
 
     def update_sprites(self, player_cursor_arguments, field_arguments,
                        fleet_arguments, ui_group_arguments):
@@ -370,6 +401,7 @@ class BattleScreen:
         pass
 
     def after_game_loop(self):
+        """Игра завершена, но экран активен"""
         while self.running:
             ui_group_arguments = []
             player_cursor_arguments = []
@@ -403,27 +435,31 @@ class BattleScreen:
         background_group.draw(screen)
         self.field1.draw(screen)
         self.field2.draw(screen)
-        self.ui_group.draw(screen)
         self.fleet1.draw(screen)
         self.fleet2.draw(screen)
         self.fire_group2.draw(screen)
         self.fire_group1.draw(screen)
         self.explosion_group1.draw(screen)
         self.explosion_group2.draw(screen)
+        self.ui_group.draw(screen)
 
     def update_label_text(self):
+        """Обновление информации об активном игроке"""
         pass
 
     def set_game_result_msg(self):
+        """Вывод результата игры"""
         pass
 
-    def check_player_shot(self):
+    def check_move_is_end(self):
+        """Проверка на завершение хода"""
         if self.current_player == 1:
             return self.field2.get_move_is_end()
         return self.field1.get_move_is_end()
 
     def replace_current_player(self):
-        self.field1.set_move_is_end(False)
+        """Смена активного игрока"""
+        self.field1.set_move_is_end(False)  # Сброс информации об окончании хода
         self.field2.set_move_is_end(False)
         if self.current_player == 1:
             self.current_player = 2
@@ -433,6 +469,7 @@ class BattleScreen:
 
 
 class MultiPlayerBattleScreen(BattleScreen):
+    """Экран игры против другого человека"""
     def __init__(self, field1, fleet1, field2, fleet2):
         super().__init__(field1, fleet1, field2, fleet2)
 
@@ -473,17 +510,13 @@ class MultiPlayerBattleScreen(BattleScreen):
         self.explosion_group2.draw(screen)
         self.ui_group.draw(screen)
 
-    def check_player_shot(self):
-        if self.current_player == 1:
-            return self.field2.get_move_is_end()
-        return self.field1.get_move_is_end()
-
 
 class SinglePlayerBattleScreen(BattleScreen):
+    """Экран игры против компьютера"""
     def __init__(self, field1, fleet1, field2, fleet2):
         super().__init__(field1, fleet1, field2, fleet2)
         self.ai_player = AIPlayer(self.fleet1, self.field1)
-        self.ai_player_timer = 0
+        self.ai_player_timer = 0  # Отсчитывает паузу между выстрелами компьютера
 
     def update_label_text(self):
         self.current_player_label.set_text("Ваш ход" if self.current_player == 1
@@ -491,29 +524,29 @@ class SinglePlayerBattleScreen(BattleScreen):
 
     def set_game_result_msg(self):
         self.current_player_label.set_text("")
-        if self.current_player == 1:
+        if self.current_player == 1:  # Победил игрок
             self.game_result_label.set_font(size=cst.GAME_RESULT_LABEL_FONT_SIZE, color=cst.GREEN)
             self.game_result_label.set_text("Вы победили!")
-        else:
+        else:  # Победил компьютер
             self.game_result_label.set_font(size=cst.GAME_RESULT_LABEL_FONT_SIZE, color=cst.RED)
             self.game_result_label.set_text("Вы проиграли!")
 
     def update_sprites(self, player_cursor_arguments, field_arguments,
                        fleet_arguments, ui_group_arguments):
         if self.current_player == 2:
-            self.ai_player_timer += 1
-            if self.ai_player_timer >= cst.AI_PLAYER_SHOOT_PERIOD:
-                self.ai_player_timer = 0
-                tile = self.ai_player.choice_tile()
-                tile.on_click(self.explosion_group1, self.fire_group1)
+            self.ai_check_shoot()
         background_group.update()
         player_cursor_group.update(*player_cursor_arguments)
+        # Поле игрока
         self.field1.update(*field_arguments, shooting=False,
                            explosion_group=self.explosion_group1, fire_group=self.fire_group1)
+        # Поле компьютера
         self.field2.update(*field_arguments, shooting=self.current_player == 1,
                            explosion_group=self.explosion_group2, fire_group=self.fire_group2)
+        # Флот игрока
         self.fleet1.update(*fleet_arguments, field=self.field1, moving=False,
                            draw_alive=True, shooting=True)
+        # Флот компьютера
         self.fleet2.update(*fleet_arguments, field=self.field2, moving=False,
                            draw_alive=False, shooting=True)
         self.ui_group.update(*ui_group_arguments)
@@ -521,6 +554,13 @@ class SinglePlayerBattleScreen(BattleScreen):
         self.explosion_group2.update()
         self.fire_group1.update()
         self.fire_group2.update()
+
+    def ai_check_shoot(self):
+        self.ai_player_timer += 1
+        if self.ai_player_timer >= cst.AI_PLAYER_SHOOT_PERIOD:
+            self.ai_player_timer = 0
+            tile = self.ai_player.choice_tile()
+            tile.on_click(self.explosion_group1, self.fire_group1)
 
     def draw_sprites(self):
         background_group.draw(screen)
@@ -536,23 +576,25 @@ class SinglePlayerBattleScreen(BattleScreen):
 
 
 class AIPlayer:
+    """Отвечает за выбор клетки, которую атакует компьютер"""
     def __init__(self, enemy_fleet, enemy_field):
         self.enemy_fleet = enemy_fleet
         self.enemy_field = enemy_field
-        self.ship_tile = None
-        self.rotation = None
-        self.is_reversed = False
+        self.ship_tile = None  # Клетка с повреждённым кораблём (текущая цель)
+        self.rotation = None  # Положение цели
+        self.is_reversed = False  # Проверка противоположного направления
 
     def choice_tile(self):
         while True:
-            if self.ship_tile is None:
+            if self.ship_tile is None:  # Нет повреждённых кораблей. Случайный выбор клетки
                 tile = choice(self.enemy_field.sprites())
                 if not tile.get_is_fired_upon():
                     if tile.get_status() == cst.SHIP_IN_CELL:
                         self.ship_tile = tile
                     return tile
                 continue
-            elif self.rotation is None:
+            elif self.rotation is None:  # Есть повреждённый корабль. Определение направления
+                # Перебор возможных направлений
                 rotations = list(range(6))
                 for i in range(6):
                     rotation = choice(rotations)
@@ -560,26 +602,30 @@ class AIPlayer:
                     tile_pos = self.enemy_field.get_neighbor(self.ship_tile.get_field_pos(),
                                                              rotation)
                     if self.enemy_field.cell_in_field(tile_pos):
-                        tile_ = self.enemy_field.get_cell(tile_pos)
-                        if not tile_.get_is_fired_upon():
-                            tile = tile_
-                            if tile.get_status() == cst.SHIP_IN_CELL:
+                        new_tile = self.enemy_field.get_cell(tile_pos)
+                        if not new_tile.get_is_fired_upon():  # Клетка ещё не обстрелянна
+                            tile = new_tile
+                            if tile.get_status() == cst.SHIP_IN_CELL:  # Попадание
                                 self.ship_tile = tile
-                                self.rotation = rotation
+                                self.rotation = rotation  # Направление определенно
                             return tile
-                self.ship_tile = None
+                self.ship_tile = None  # Корабль был одноклеточным. Случайный выбор клетки
                 continue
+            # Есть повреждённый корабль, направление определенно. Добивание
             tile = self.ship_tile
             while tile.get_is_fired_upon():
                 tile_pos = self.enemy_field.get_neighbor(tile.get_field_pos(), self.rotation)
                 new_tile = self.enemy_field.get_cell(tile_pos)
                 if (new_tile is None
                         or new_tile.get_is_fired_upon() and new_tile.get_status() == cst.EMPTY_CELL):
+                    # Обстрелянная пустая или несуществующая клетка
                     if self.is_reversed:
+                        # Цель уничтожена. Случайный выбор клетки
                         self.ship_tile = None
                         self.rotation = None
                         self.is_reversed = False
                         break
+                    # Смена направления
                     self.is_reversed = True
                     self.rotation = reverse_rotation(self.rotation)
                 if new_tile is not None:
@@ -599,6 +645,7 @@ class BackgroundImage(pygame.sprite.Sprite):
 
 
 class PlayerCursor(pygame.sprite.Sprite):
+    """Предназначен для отслеживания взаимодействия курсора с клетками и кораблями"""
     def __init__(self):
         super().__init__(player_cursor_group)
         self.image = pygame.Surface((1, 1))
@@ -613,21 +660,22 @@ class PlayerCursor(pygame.sprite.Sprite):
 
 
 class HexTile(pygame.sprite.Sprite):
+    """Клетка поля"""
     shallow_image = pygame.transform.rotate(load_image("shallow.png"), 30)
     deep_image = pygame.transform.rotate(load_image("deep.png"), 30)
 
     def __init__(self, field, pos, field_pos):
         super().__init__(field)
         self.field = field
-        self.is_active = False
-        self.is_fired_upon = False
+        self.is_active = False  # На клетку наведён курсор
+        self.is_fired_upon = False  # Клетка обстрелянна
         self.image = self.shallow_image
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = pos
-        self.field_pos = field_pos
+        self.field_pos = field_pos  # Позиция на поле
         self.mask = pygame.mask.from_surface(self.image)
-        self.ship = None
-        self.status = cst.EMPTY_CELL
+        self.ship = None  # Корабль, прикреплённый к тайлу
+        self.status = cst.EMPTY_CELL  # Наличие/отсутствие корабля
 
     def get_status(self):
         return self.status
@@ -657,14 +705,15 @@ class HexTile(pygame.sprite.Sprite):
         shooting = kwargs.get("shooting", False)
         explosion_group = kwargs.get("explosion_group", None)
         fire_group = kwargs.get("fire_group", None)
-        self.is_active = pygame.sprite.spritecollideany(self,
-                                                        player_cursor_group,
+        # Проверка взаимодействия с курсором
+        self.is_active = pygame.sprite.spritecollideany(self, player_cursor_group,
                                                         (lambda s1, s2:
                                                          pygame.sprite.collide_mask(s1, s2)))
         for event in args:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
                     if shooting and self.is_active:
+                        # Обстрел клетки
                         self.on_click(explosion_group, fire_group)
         if self.is_active or self.is_fired_upon:
             self.image = self.deep_image
@@ -712,6 +761,7 @@ class HexTile(pygame.sprite.Sprite):
 
 
 class HexField(pygame.sprite.Group):
+    """Игровое поле"""
     def __init__(self, x, y, width, height):
         super().__init__()
         self.width = width
@@ -783,6 +833,7 @@ class HexField(pygame.sprite.Group):
 
 
 class Fleet(pygame.sprite.Group):
+    """Группа кораблей"""
     def __init__(self, patrol_boats_count=5, destroyers_count=2, submarines_count=2,
                  cruisers_count=3, battleships_count=1, carriers_count=1):
         super().__init__()
@@ -816,11 +867,12 @@ class Fleet(pygame.sprite.Group):
             ship.remove_from_field()
 
     def check_alive(self):
+        """Остались живые корабли"""
         return any(map(lambda ship: ship.get_is_alive(), self.sprites()))
 
 
 class Ship(pygame.sprite.Sprite):
-    """Abstract class"""
+    """Абстрактный класс корабля"""
 
     def __init__(self, fleet, image, length):
         super().__init__(fleet)
@@ -831,8 +883,8 @@ class Ship(pygame.sprite.Sprite):
         self.mask = pygame.mask.from_surface(self.image)
         self.rotation = cst.RIGHT
         self.head_point = (0, 0)
-        self.head_tile = None
-        self.bind_to_cursor = False
+        self.head_tile = None  # Клетка, к которй прикреплён корабль
+        self.bind_to_cursor = False  # Корабль прикреплён к курсору
         self.is_alive = True
 
     def update(self, *args, **kwargs):
@@ -843,18 +895,23 @@ class Ship(pygame.sprite.Sprite):
         for event in args:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
+                    # Прикрепление к курсору
                     self.on_click(event, moving)
                 elif event.button == pygame.BUTTON_WHEELDOWN:
+                    # Поворот по часовой стрелке
                     if self.bind_to_cursor:
                         self.set_rotation(self.rotation - 1)
                 elif event.button == pygame.BUTTON_WHEELUP:
+                    # Поворот против часовой стрелки
                     if self.bind_to_cursor:
                         self.set_rotation(self.rotation + 1)
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == pygame.BUTTON_LEFT and field is not None:
+                    # Прикрепление к клетке или возвращение в хранилище
                     self.on_button_up(field)
             elif event.type == pygame.MOUSEMOTION:
                 if self.bind_to_cursor:
+                    # Движение вместе с курсором
                     self.bind_to_point(event.pos)
         self.image = self.temp_image.copy()
         if self.is_alive and shooting:
@@ -862,6 +919,7 @@ class Ship(pygame.sprite.Sprite):
             if not self.is_alive:
                 self.mark_neighboring_cells()
         if self.is_alive and not draw_alive:
+            # Скрытие корабля, если он не потоплен
             self.image.fill(cst.TRANSPARENT)
 
     def on_click(self, event, moving):
@@ -936,6 +994,7 @@ class Ship(pygame.sprite.Sprite):
         tile.set_ship(self)
 
     def remove_from_field(self):
+        """Удаление корабля с поля"""
         if self.head_tile is None:
             return
         field = self.head_tile.get_field()
@@ -961,6 +1020,7 @@ class Ship(pygame.sprite.Sprite):
         return any(map(lambda tile: not tile.get_is_fired_upon(), tiles))
 
     def get_tiles(self):
+        """Клетки, на которых расположен корабль"""
         if self.head_tile is None:
             return []
         field = self.head_tile.get_field()
@@ -972,6 +1032,7 @@ class Ship(pygame.sprite.Sprite):
         return tiles
 
     def mark_neighboring_cells(self):
+        """Закрашивание соседних клеток после уничтожения корабля"""
         field = self.head_tile.get_field()
         for tile in self.get_tiles():
             for neighbor in field.get_neighbors(tile.get_field_pos()):
@@ -1028,6 +1089,7 @@ class Carrier(Ship):
 
 
 class ShipSpawnButtonGroup(pygame.sprite.Group):
+    """Группа кнопок, отвечающих за выдачу кораблей"""
     def __init__(self, fleet):
         super().__init__()
         self.fleet = fleet
@@ -1064,6 +1126,7 @@ class ShipSpawnButtonGroup(pygame.sprite.Group):
 
 
 class InterfaceLabel(pygame.sprite.Sprite):
+    """Текстовая метка"""
     def __init__(self, group, size, color, text="", border_width=0, border_color=cst.BLACK):
         super().__init__(group)
         self.width, self.height = size
@@ -1124,6 +1187,7 @@ class InterfaceLabel(pygame.sprite.Sprite):
 
 
 class InterfaceButton(InterfaceLabel):
+    """Метка, с которой можно взаимодействовать"""
     def __init__(self, group, size, color, text="", border_width=0, border_color=cst.BLACK):
         super().__init__(group, size, color, text, border_width, border_color)
         self.on_click_func = lambda ev: None
@@ -1139,6 +1203,7 @@ class InterfaceButton(InterfaceLabel):
 
 
 class SpawnShipButton(InterfaceLabel):
+    """Клетка, выдающая корабль при нажатии"""
     def __init__(self, group, pos, ship_image, ships_list):
         self.ship_image = ship_image
         self.ships_list = []
@@ -1149,12 +1214,14 @@ class SpawnShipButton(InterfaceLabel):
         self.rect.x, self.rect.y = pos
 
     def add_ship(self, ship):
+        """Добавление корабля в список и перемещение его в хранилище"""
         self.ships_list.append(ship)
         ship.set_rotation(cst.RIGHT)
         ship.bind_to_point(cst.SHIP_STORAGE_COORDS)
         self.image = self.make_image()
 
     def move_ships_to_field(self):
+        """Удаление всех кораблей из списка"""
         for i, ship in reversed(list(enumerate(self.ships_list))):
             self.ships_in_field.append(ship)
             self.ships_list.pop(i)
@@ -1180,6 +1247,7 @@ class SpawnShipButton(InterfaceLabel):
                 if event.button == pygame.BUTTON_LEFT:
                     if self.rect.collidepoint(event.pos):
                         if self.ships_list:
+                            # Выдача корабля
                             ship = self.ships_list.pop()
                             ship.set_bind_to_cursor(True)
                             ship.bind_to_point(event.pos)
@@ -1187,12 +1255,14 @@ class SpawnShipButton(InterfaceLabel):
                             self.image = self.make_image()
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == pygame.BUTTON_LEFT:
+                    # Возвращение неприкреплённых кораблей в хранилище
                     for i, ship in reversed(list(enumerate(self.ships_in_field))):
                         if ship.get_head_tile() is None:
                             self.add_ship(self.ships_in_field.pop(i))
 
 
 class Effect(pygame.sprite.Sprite):
+    """Абстрактный класс эффекта"""
     def __init__(self, group, sprites_list, change_sprites_period, is_looped=False):
         super().__init__(group)
         self.sprites_list = [sprite for sprite in sprites_list]
@@ -1230,6 +1300,7 @@ class Effect(pygame.sprite.Sprite):
             if self.is_looped:
                 self.sprite_index %= len(self.sprites_list)
             elif self.sprite_index >= len(self.sprites_list):
+                # Конец анимации
                 self.image.fill(cst.TRANSPARENT)
                 self.move_to_storage()
                 return
@@ -1246,6 +1317,7 @@ class Effect(pygame.sprite.Sprite):
 
 
 class HittingShipExplosion(Effect):
+    """Взрыв при попадании в корабль"""
     sprites = [load_image(f"effects/hitting_ship_explosion/{str(x).rjust(4, '0')}.png")
                for x in range(1, 20)]
 
@@ -1254,6 +1326,7 @@ class HittingShipExplosion(Effect):
 
 
 class MissExplosion(Effect):
+    """Взрыв при попадании в пустую клетку"""
     sprites = [load_image(f"effects/miss_explosion/{str(x).rjust(4, '0')}.png")
                for x in range(1, 36)]
 
@@ -1262,6 +1335,7 @@ class MissExplosion(Effect):
 
 
 class ExplosionGroup(pygame.sprite.Group):
+    """Группа взрывов"""
     def __init__(self):
         super().__init__()
         self.hitting_ship_explosions = [HittingShipExplosion(self) for _ in range(5)]
@@ -1270,12 +1344,13 @@ class ExplosionGroup(pygame.sprite.Group):
             sprite.move_to_storage()
 
     def get_hitting_ship_explosion(self):
-        return self.get_explosion(self.hitting_ship_explosions, HittingShipExplosion)
+        return self._get_explosion(self.hitting_ship_explosions, HittingShipExplosion)
 
     def get_miss_explosion(self):
-        return self.get_explosion(self.miss_explosions, MissExplosion)
+        return self._get_explosion(self.miss_explosions, MissExplosion)
 
-    def get_explosion(self, explosions_list, explosion_type):
+    def _get_explosion(self, explosions_list, explosion_type):
+        """Выдыча взрыва"""
         for explosion in explosions_list:
             if not explosion.get_is_active():
                 return explosion
@@ -1286,6 +1361,7 @@ class ExplosionGroup(pygame.sprite.Group):
 
 
 class HittingShipFire(Effect):
+    """Горение на клетке с повреждённым кораблём"""
     sprites = [pygame.transform.scale2x(load_image(f"effects/hitting_ship_fire/"
                                                    f"{str(x).rjust(4, '0')}.png"))
                for x in range(1, 130)]
@@ -1295,6 +1371,7 @@ class HittingShipFire(Effect):
 
 
 class FireGroup(pygame.sprite.Group):
+    """Группа огней"""
     def __init__(self):
         super().__init__()
         self.hitting_ship_fires = [HittingShipFire(self) for _ in range(30)]
@@ -1302,9 +1379,10 @@ class FireGroup(pygame.sprite.Group):
             sprite.move_to_storage()
 
     def get_hitting_ship_fire(self):
-        return self.get_fire(self.hitting_ship_fires, HittingShipFire)
+        return self._get_fire(self.hitting_ship_fires, HittingShipFire)
 
-    def get_fire(self, fires_list, fire_type):
+    def _get_fire(self, fires_list, fire_type):
+        """Выдача огня"""
         for fire in fires_list:
             if not fire.get_is_active():
                 return fire
