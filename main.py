@@ -163,9 +163,9 @@ class ShipPlacementScreen:
         self.ship_spawn_btn_group.get_battleships_btn().set_coords((x, cst.BTN_SIZE[1] * 4 + 10))
         self.ship_spawn_btn_group.get_carriers_btn().set_coords((x, cst.BTN_SIZE[1] * 5 + 10))
         self.ui_group = pygame.sprite.Group()
-        self.label = InterfaceLabel(self.ui_group,
-                                    (cst.WIDTH - 30 - cst.BTN_SIZE[0], cst.BTN_SIZE[1]),
-                                    cst.TRANSPARENT)
+        self.errors_label = InterfaceLabel(self.ui_group,
+                                           (cst.WIDTH - 30 - cst.BTN_SIZE[0], cst.BTN_SIZE[1]),
+                                           cst.TRANSPARENT)
         self.to_main_menu_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
                                                 cst.BTN_COLOR, "Вернуться в главное меню", 1)
         self.random_placement_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
@@ -178,8 +178,8 @@ class ShipPlacementScreen:
         self.status = cst.TO_NEXT_SCREEN
 
     def init_ui(self):
-        self.label.set_font(color=cst.RED)
-        self.label.set_coords((10, cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+        self.errors_label.set_font(color=cst.RED)
+        self.errors_label.set_coords((10, cst.HEIGHT - cst.BTN_SIZE[1] - 10))
         self.to_main_menu_btn.on_click(self.to_main_menu)
         self.to_main_menu_btn.set_coords((cst.WIDTH - cst.BTN_SIZE[0] - 10,
                                           cst.HEIGHT - (cst.BTN_SIZE[1] + 10) * 4))
@@ -219,11 +219,11 @@ class ShipPlacementScreen:
                     ui_group_arguments.append(event)
             place_ship_result = self.field.get_place_ship_result()
             if place_ship_result == cst.SHIP_OUTSIDE_FIELD:
-                self.label.set_text("Корабль за пределами поля!")
+                self.errors_label.set_text("Корабль за пределами поля!")
             elif place_ship_result == cst.SHIPS_OVERLAY:
-                self.label.set_text("Наложение кораблей!")
+                self.errors_label.set_text("Наложение кораблей!")
             elif place_ship_result == cst.SHIPS_NEIGHBORHOOD:
-                self.label.set_text("Соседство кораблей!")
+                self.errors_label.set_text("Соседство кораблей!")
             self.field.set_place_ship_result(cst.SUCCESS)
             background_group.update()
             player_cursor_group.update(*player_cursor_arguments)
@@ -253,8 +253,9 @@ class ShipPlacementScreen:
             if all(map(lambda ship: ship.get_head_tile() is not None, ships)):
                 self.running = False
                 self.status = cst.TO_NEXT_SCREEN
+                self.field.set_place_ship_result(cst.SUCCESS)
                 return True
-            self.label.set_text("Не все корабли расставленны!")
+            self.errors_label.set_text("Не все корабли расставленны!")
         return False
 
     def to_main_menu(self, event):
@@ -262,6 +263,7 @@ class ShipPlacementScreen:
             self.clear_field(event)
             self.running = False
             self.status = cst.TO_MAIN_MENU
+            self.field.set_place_ship_result(cst.SUCCESS)
 
     def clear_field(self, event):
         if event.button == pygame.BUTTON_LEFT:
@@ -286,8 +288,9 @@ class BattleScreen:
         self.game_running = True
         self.clock = pygame.time.Clock()
         self.ui_group = pygame.sprite.Group()
-        self.label = InterfaceLabel(self.ui_group, (cst.BTN_SIZE[0] * 2, cst.BTN_SIZE[1]),
-                                    cst.TRANSPARENT)
+        self.current_player_label = InterfaceLabel(self.ui_group,
+                                                   (cst.BTN_SIZE[0] * 2, cst.BTN_SIZE[1]),
+                                                   cst.TRANSPARENT)
         self.game_result_label = InterfaceLabel(self.ui_group, (cst.WIDTH // 2, cst.HEIGHT // 2),
                                                 cst.TRANSPARENT)
         self.to_main_menu_btn = InterfaceButton(self.ui_group, cst.BTN_SIZE,
@@ -296,8 +299,9 @@ class BattleScreen:
         self.update_label_text()
 
     def init_ui(self):
-        self.label.set_font(color=cst.GREEN)
-        self.label.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0], cst.HEIGHT - cst.BTN_SIZE[1] - 10))
+        self.current_player_label.set_font(color=cst.GREEN)
+        self.current_player_label.set_coords((cst.WIDTH // 2 - cst.BTN_SIZE[0],
+                                              cst.HEIGHT - cst.BTN_SIZE[1] - 10))
         self.game_result_label.set_font(size=cst.GAME_RESULT_LABEL_FONT_SIZE, color=cst.GREEN)
         self.game_result_label.set_coords((cst.WIDTH // 4, cst.HEIGHT // 4))
         self.to_main_menu_btn.on_click(self.to_main_menu)
@@ -321,6 +325,8 @@ class BattleScreen:
                 tile.set_is_fired_upon(False)
             self.field1.set_move_is_end(False)
             self.field2.set_move_is_end(False)
+            self.field1.set_place_ship_result(cst.SUCCESS)
+            self.field2.set_place_ship_result(cst.SUCCESS)
 
     def main_loop(self):
         while self.game_running:
@@ -431,10 +437,10 @@ class MultiPlayerBattleScreen(BattleScreen):
         super().__init__(field1, fleet1, field2, fleet2)
 
     def update_label_text(self):
-        self.label.set_text(f"Ходит {self.current_player} игрок")
+        self.current_player_label.set_text(f"Ходит {self.current_player} игрок")
 
     def set_game_result_msg(self):
-        self.label.set_text("")
+        self.current_player_label.set_text("")
         self.game_result_label.set_text(f"Победил {self.current_player} игрок!")
 
     def update_sprites(self, player_cursor_arguments, field_arguments,
@@ -480,10 +486,11 @@ class SinglePlayerBattleScreen(BattleScreen):
         self.ai_player_timer = 0
 
     def update_label_text(self):
-        self.label.set_text("Ваш ход" if self.current_player == 1 else "Ход противника")
+        self.current_player_label.set_text("Ваш ход" if self.current_player == 1
+                                           else "Ход противника")
 
     def set_game_result_msg(self):
-        self.label.set_text("")
+        self.current_player_label.set_text("")
         if self.current_player == 1:
             self.game_result_label.set_font(size=cst.GAME_RESULT_LABEL_FONT_SIZE, color=cst.GREEN)
             self.game_result_label.set_text("Вы победили!")
