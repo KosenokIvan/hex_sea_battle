@@ -240,7 +240,7 @@ class ShipPlacementScreen:
     def update_sprites(self, player_cursor_arguments, field_arguments,
                        fleet_arguments, ui_group_arguments):
         background_group.update()
-        player_cursor_group.update(*player_cursor_arguments)
+        player_cursor_group.update(*player_cursor_arguments, fields=[self.field])
         self.field.update(*field_arguments, shooting=False)
         self.fleet.update(*fleet_arguments, field=self.field, moving=True, draw_alive=True)
         self.ship_spawn_btn_group.update(*ui_group_arguments)
@@ -421,7 +421,7 @@ class BattleScreen:
     def after_game_update_sprites(self, ui_group_arguments, player_cursor_arguments):
         background_group.update()
         self.ui_group.update(*ui_group_arguments)
-        player_cursor_group.update(*player_cursor_arguments)
+        player_cursor_group.update(*player_cursor_arguments, fields=[self.field1, self.field2])
         self.field1.update(shooting=False)
         self.field2.update(shooting=False)
         self.fire_group1.update()
@@ -483,7 +483,7 @@ class MultiPlayerBattleScreen(BattleScreen):
     def update_sprites(self, player_cursor_arguments, field_arguments,
                        fleet_arguments, ui_group_arguments):
         background_group.update()
-        player_cursor_group.update(*player_cursor_arguments)
+        player_cursor_group.update(*player_cursor_arguments, fields=[self.field1, self.field2])
         self.field1.update(*field_arguments, shooting=self.current_player == 2,
                            explosion_group=self.explosion_group1, fire_group=self.fire_group1)
         self.field2.update(*field_arguments, shooting=self.current_player == 1,
@@ -536,7 +536,7 @@ class SinglePlayerBattleScreen(BattleScreen):
         if self.current_player == 2:
             self.ai_check_shoot()
         background_group.update()
-        player_cursor_group.update(*player_cursor_arguments)
+        player_cursor_group.update(*player_cursor_arguments, fields=[self.field1, self.field2])
         # Поле игрока
         self.field1.update(*field_arguments, shooting=False,
                            explosion_group=self.explosion_group1, fire_group=self.fire_group1)
@@ -654,9 +654,16 @@ class PlayerCursor(pygame.sprite.Sprite):
         self.mask = pygame.mask.from_surface(self.image)
 
     def update(self, *args, **kwargs):
+        fields = kwargs.get("fields", [])
         for event in args:
             if event.type == pygame.MOUSEMOTION:
                 self.rect.x, self.rect.y = event.pos
+        for field in fields:
+            active_tile = pygame.sprite.spritecollideany(self, field,
+                                                         lambda s1, s2:
+                                                         pygame.sprite.collide_mask(s1, s2))
+            if active_tile is not None:
+                active_tile.set_is_active(True)
 
 
 class HexTile(pygame.sprite.Sprite):
@@ -705,10 +712,6 @@ class HexTile(pygame.sprite.Sprite):
         shooting = kwargs.get("shooting", False)
         explosion_group = kwargs.get("explosion_group", None)
         fire_group = kwargs.get("fire_group", None)
-        # Проверка взаимодействия с курсором
-        self.is_active = pygame.sprite.spritecollideany(self, player_cursor_group,
-                                                        (lambda s1, s2:
-                                                         pygame.sprite.collide_mask(s1, s2)))
         for event in args:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == pygame.BUTTON_LEFT:
@@ -719,6 +722,7 @@ class HexTile(pygame.sprite.Sprite):
             self.image = self.deep_image
         else:
             self.image = self.shallow_image
+        self.is_active = False
 
     def on_click(self, explosion_group, fire_group):
         if not self.is_fired_upon:
@@ -776,7 +780,7 @@ class HexField(pygame.sprite.Group):
         for y in range(self.height):
             self.field.append([])
             for x in range(self.width):
-                hex_x = x * 28 + field_x + (14 if y % 2 == 0 else 0)
+                hex_x = x * 27 + field_x + (14 if y % 2 == 0 else 0)
                 hex_y = y * 24 + field_y
                 self.field[-1].append(HexTile(self, (hex_x, hex_y), (x, y)))
 
