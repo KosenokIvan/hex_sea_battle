@@ -30,7 +30,7 @@ def load_image(name, color_key=None):
 
 
 def rotate(image, pos, angle):
-    """Поворот изображения относиельно выбранной точки"""
+    """Поворот изображения относительно выбранной точки"""
     width, height = image.get_size()
     image2 = pygame.Surface((width * 2, height * 2), pygame.SRCALPHA)
     image2.blit(image, (width - pos[0], height - pos[1]))
@@ -280,7 +280,7 @@ class ShipPlacementScreen:
                 self.status = cst.TO_NEXT_SCREEN
                 self.field.set_place_ship_result(cst.SUCCESS)
             else:
-                self.errors_label.set_text("Не все корабли расставленны!")
+                self.errors_label.set_text("Не все корабли расставлены!")
 
     def to_main_menu(self, event):
         """Нажатие на кнопку возврата в меню"""
@@ -595,7 +595,8 @@ class AIPlayer:
                 continue
             elif self.rotation is None:  # Есть повреждённый корабль. Определение направления
                 # Перебор возможных направлений
-                rotations = list(range(6))
+                rotations = [cst.RIGHT, cst.RIGHT_TOP, cst.LEFT_TOP,
+                             cst.LEFT, cst.LEFT_DOWN, cst.RIGHT_DOWN]
                 for i in range(6):
                     rotation = choice(rotations)
                     rotations.remove(rotation)
@@ -887,7 +888,7 @@ class Ship(pygame.sprite.Sprite):
         self.mask = pygame.mask.from_surface(self.image)
         self.rotation = cst.RIGHT
         self.head_point = (0, 0)
-        self.head_tile = None  # Клетка, к которй прикреплён корабль
+        self.head_tile = None  # Клетка, к которой прикреплён корабль
         self.bind_to_cursor = False  # Корабль прикреплён к курсору
         self.is_alive = True
 
@@ -1354,7 +1355,7 @@ class ExplosionGroup(pygame.sprite.Group):
         return self._get_explosion(self.miss_explosions, MissExplosion)
 
     def _get_explosion(self, explosions_list, explosion_type):
-        """Выдыча взрыва"""
+        """Выдача взрыва"""
         for explosion in explosions_list:
             if not explosion.get_is_active():
                 return explosion
